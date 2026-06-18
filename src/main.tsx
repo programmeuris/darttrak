@@ -44,6 +44,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   }
 }
 
+/** Redirects via an effect (after commit) instead of mutating the hash during render. */
+function Redirect({ to }: { to: string }) {
+  useEffect(() => {
+    navigate(to);
+  }, [to]);
+  return null;
+}
+
 /** Picks the x01 or Around the Clock live screen based on the match's game type. */
 function LiveRoute({ matchId }: { matchId: string }) {
   const [isAtc, setIsAtc] = useState<boolean | null | undefined>(undefined);
@@ -64,10 +72,7 @@ function LiveRoute({ matchId }: { matchId: string }) {
   }, [matchId]);
 
   if (isAtc === undefined) return <div className="screen" />;
-  if (isAtc === null) {
-    navigate('/');
-    return null;
-  }
+  if (isAtc === null) return <Redirect to="/" />;
   // key={matchId} so switching matches resets the live screen's input state.
   return isAtc ? (
     <LiveAtc key={matchId} matchId={matchId} />
@@ -83,24 +88,17 @@ function Screen({ name, params }: { name: string; params: string[] }) {
     case 'setup':
       return <Setup />;
     case 'live':
-      if (!params[0]) {
-        navigate('/');
-        return null;
-      }
+      if (!params[0]) return <Redirect to="/" />;
       return <LiveRoute matchId={params[0]} />;
     case 'summary':
-      if (!params[0]) {
-        navigate('/');
-        return null;
-      }
+      if (!params[0]) return <Redirect to="/" />;
       return <Summary matchId={params[0]} />;
     case 'history':
       return <History matchId={params[0]} />;
     case 'stats':
       return <PlayerStats />;
     default:
-      navigate('/');
-      return null;
+      return <Redirect to="/" />;
   }
 }
 
