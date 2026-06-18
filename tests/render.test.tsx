@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto';
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { Home } from '../src/screens/Home';
 import { Setup } from '../src/screens/Setup';
 import { PlayerStats } from '../src/screens/PlayerStats';
-import { importAllData } from '../src/db';
+import { Live } from '../src/screens/Live';
+import { addPlayer, saveMatch, getMatch, importAllData } from '../src/db';
+import { makeMatch, makeLeg } from './helpers';
 
 afterEach(async () => {
   cleanup();
@@ -41,5 +43,33 @@ describe('screens render without crashing', () => {
   it('PlayerStats prompts to add players when none exist', async () => {
     render(<PlayerStats />);
     expect(await screen.findByText('Add players to see stats.')).toBeTruthy();
+  });
+
+  it('Live mounts an in-progress 501 match and records exactly one turn per confirm', async () => {
+    const alice = await addPlayer('Alice');
+    const match = makeMatch({
+      id: 'm-live',
+      gameType: '501',
+      playerIds: [alice.id],
+      status: 'in_progress',
+      legs: [makeLeg('m-live', [])],
+    });
+    await saveMatch(match);
+
+    render(<Live matchId="m-live" />);
+    // Scoreboard renders the player and starting score once the match loads.
+    expect(await screen.findByText('Alice')).toBeTruthy();
+    expect(screen.getByText('501')).toBeTruthy();
+
+    // Enter a dart, then double-click Confirm — the guard must record only one turn.
+    fireEvent.click(screen.getByText('20'));
+    const confirm = screen.getByText('Confirm Turn');
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    await waitFor(async () => {
+      const saved = await getMatch('m-live');
+      expect(saved!.legs[0].turns).toHaveLength(1);
+    });
   });
 });
