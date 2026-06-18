@@ -7,6 +7,8 @@ connections — all data is stored in your browser via **IndexedDB**.
 ## Features
 
 - **501 / 301** scoring with configurable **Double Out** and best-of-1/3/5 leg formats
+- **Around the Clock** mode — race 1 → 20 → bull with a hit/miss tap input and a
+  Singles / Doubles / Trebles ring setting (tracked separately in stats)
 - **1–4 players** per match, drawn from a saved roster
 - **Live scoring** screen optimised for mobile: large tap targets, segmented
   multiplier numpad (Single / Double / Treble + Bull + Miss), real-time bust and
@@ -94,5 +96,5 @@ npx esbuild scripts/test-scoring.ts --bundle --platform=node --format=esm \
 
 ## Stretch goals (not yet implemented)
 
-Cricket and Around the Clock modes, checkout suggestions, sound effects, and
+Cricket mode, dedicated Around the Clock analytics, checkout suggestions, sound effects, and
 local-network multi-device sync.

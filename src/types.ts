@@ -1,6 +1,13 @@
 export type GameType = '501' | '301' | 'Cricket' | 'AroundTheClock';
 export type MatchStatus = 'in_progress' | 'completed';
 
+/**
+ * Required ring for an Around the Clock match. Purely a difficulty/labelling
+ * choice — input is still hit/miss — but stored so analytics can separate
+ * single vs double vs triple games.
+ */
+export type AtcRing = 'single' | 'double' | 'triple';
+
 export interface Player {
   id: string; // uuid
   name: string;
@@ -40,6 +47,7 @@ export interface Match {
     sets: number; // e.g. 1 for no sets
   };
   doubleOut: boolean;
+  atcRing?: AtcRing; // only set for Around the Clock matches
   status: MatchStatus;
   legs: Leg[];
 }

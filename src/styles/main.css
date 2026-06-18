@@ -336,6 +336,59 @@ body {
   color: var(--muted);
 }
 
+/* ---- Around the Clock ---- */
+.sc-target {
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -1px;
+}
+.score-card.active .sc-target {
+  color: var(--accent);
+}
+.atc-progress {
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 8px 0 4px;
+}
+.atc-progress-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+.atc-aim {
+  text-align: center;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+.atc-aim strong {
+  color: var(--text);
+  font-size: 1.2rem;
+}
+.dart-slot.hit {
+  border-color: var(--success);
+  color: var(--success);
+}
+.dart-slot.miss {
+  border-color: var(--muted);
+  color: var(--muted);
+}
+.hit-btn {
+  background: var(--success);
+  color: #fff;
+  min-height: 64px;
+  font-size: 1.2rem;
+}
+.miss-btn {
+  background: var(--surface-2);
+  color: var(--text);
+  min-height: 64px;
+  font-size: 1.2rem;
+}
+
 /* ---- Live: banner ---- */
 .banner {
   border-radius: var(--radius);
