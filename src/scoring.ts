@@ -1,4 +1,17 @@
-import type { DartThrow, Leg, Turn } from './types';
+import type { DartThrow, GameType, Leg, Turn } from './types';
+
+/** Game types that use x01 point semantics (running total down to zero). */
+export const X01_GAME_TYPES: readonly GameType[] = ['501', '301'];
+
+/**
+ * Whether a match uses x01 scoring. The current analytics (averages, checkout %,
+ * distributions, consistency) all assume x01 point semantics, so non-x01 modes
+ * like Cricket / Around the Clock must be excluded from them and given their own
+ * metrics instead.
+ */
+export function isX01(gameType: GameType): boolean {
+  return gameType === '501' || gameType === '301';
+}
 
 /** Starting score for the given x01 game type. */
 export function startingScore(gameType: '501' | '301'): number {

@@ -4,6 +4,7 @@ import {
   scoringStats,
   headToHead,
 } from '../src/analysis';
+import { computePlayerOverview } from '../src/stats';
 import type { Match, DartThrow, Turn } from '../src/types';
 
 let failed = 0;
@@ -98,6 +99,31 @@ eq('h2h played', h2h[0].played, 2);
 eq('h2h won', h2h[0].won, 1);
 eq('h2h lost', h2h[0].lost, 1);
 eq('h2h winrate', h2h[0].winRate, 50);
+
+// ---- Guard: non-x01 (Cricket) matches must be excluded from x01 analytics ----
+const cricket: Match = {
+  id: 'c1',
+  date: 3000,
+  gameType: 'Cricket',
+  playerIds: [A, B],
+  winnerId: A,
+  format: { legs: 1, sets: 1 },
+  doubleOut: false,
+  status: 'completed',
+  legs: [
+    {
+      id: 'CL',
+      matchId: 'c1',
+      winnerId: A,
+      // Bogus huge "score" that would wreck x01 averages/spread if not excluded.
+      turns: [t3(A, 999, 0, [d(0, 'x'), d(0, 'x'), d(0, 'x')])],
+    },
+  ],
+};
+
+eq('guard: consistency excludes cricket', consistencyStats([m1, cricket], A).visits, cons.visits);
+eq('guard: scoring excludes cricket', scoringStats([m1, cricket], A).highestVisit, sc.highestVisit);
+eq('guard: overview played excludes cricket', computePlayerOverview([m1, m2, cricket], A).matchesPlayed, 2);
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`);
 if (failed > 0) process.exit(1);
