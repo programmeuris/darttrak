@@ -1,0 +1,120 @@
+import type { Match, Leg, Turn } from './types';
+import {
+  calculateAverage,
+  count180s,
+  bestCheckout,
+} from './scoring';
+
+export interface PlayerOverview {
+  matchesPlayed: number;
+  matchesWon: number;
+  winRate: number; // 0-100
+  overallAverage: number; // 3-dart average across all matches
+  bestMatchAverage: number;
+  total180s: number;
+  bestCheckout: number;
+}
+
+function completedMatchesFor(matches: Match[], playerId: string): Match[] {
+  return matches.filter(
+    (m) => m.status === 'completed' && m.playerIds.includes(playerId),
+  );
+}
+
+/** Aggregate lifetime stats for a single player across all their matches. */
+export function computePlayerOverview(
+  matches: Match[],
+  playerId: string,
+): PlayerOverview {
+  const played = completedMatchesFor(matches, playerId);
+  const matchesWon = played.filter((m) => m.winnerId === playerId).length;
+
+  // Overall average: weight by darts thrown across every leg of every match.
+  const allLegs: Leg[] = [];
+  for (const m of played) allLegs.push(...m.legs);
+  const overallAverage = calculateAverage(allLegs, playerId);
+
+  let bestMatchAverage = 0;
+  for (const m of played) {
+    const avg = calculateAverage(m.legs, playerId);
+    if (avg > bestMatchAverage) bestMatchAverage = avg;
+  }
+
+  const total180s = count180s(allLegs, playerId);
+  const best = bestCheckout(allLegs, playerId);
+
+  return {
+    matchesPlayed: played.length,
+    matchesWon,
+    winRate: played.length === 0 ? 0 : (matchesWon / played.length) * 100,
+    overallAverage,
+    bestMatchAverage,
+    total180s,
+    bestCheckout: best,
+  };
+}
+
+export interface AveragePoint {
+  date: number;
+  label: string;
+  average: number;
+}
+
+/** Per-match 3-dart average over time (oldest → newest), for the line chart. */
+export function averagePerMatch(
+  matches: Match[],
+  playerId: string,
+): AveragePoint[] {
+  const played = completedMatchesFor(matches, playerId).sort(
+    (a, b) => a.date - b.date,
+  );
+  return played.map((m) => ({
+    date: m.date,
+    label: new Date(m.date).toLocaleDateString(),
+    average: calculateAverage(m.legs, playerId),
+  }));
+}
+
+/** Score distribution buckets for turns thrown by a player (bar chart). */
+export interface ScoreDistribution {
+  labels: string[];
+  counts: number[];
+}
+
+const BUCKETS: { label: string; min: number; max: number }[] = [
+  { label: '0–40', min: 0, max: 40 },
+  { label: '41–80', min: 41, max: 80 },
+  { label: '81–120', min: 81, max: 120 },
+  { label: '121–160', min: 121, max: 160 },
+  { label: '161–180', min: 161, max: 180 },
+];
+
+export function scoreDistribution(
+  matches: Match[],
+  playerId: string,
+): ScoreDistribution {
+  const counts = new Array(BUCKETS.length).fill(0);
+  const played = completedMatchesFor(matches, playerId);
+  for (const m of played) {
+    for (const leg of m.legs) {
+      for (const turn of leg.turns) {
+        if (turn.playerId !== playerId) continue;
+        const score = turn.isBust ? 0 : turn.totalScore;
+        const idx = BUCKETS.findIndex((b) => score >= b.min && score <= b.max);
+        if (idx >= 0) counts[idx]++;
+      }
+    }
+  }
+  return { labels: BUCKETS.map((b) => b.label), counts };
+}
+
+/** Flatten all turns by a player in a single match (for breakdowns). */
+export function playerTurnsInMatch(match: Match, playerId: string): Turn[] {
+  const out: Turn[] = [];
+  for (const leg of match.legs) {
+    for (const turn of leg.turns) {
+      if (turn.playerId === playerId) out.push(turn);
+    }
+  }
+  return out;
+}
