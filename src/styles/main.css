@@ -634,6 +634,82 @@ body {
   height: 240px;
 }
 
+/* ---- Stats tabs ---- */
+.tab-bar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  appearance: none;
+  border: 1px solid var(--surface-2);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0 16px;
+  min-height: 44px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ---- Rating badge (consistency) ---- */
+.rating-line {
+  display: flex;
+  justify-content: center;
+}
+.rating-badge {
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 18px;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+/* ---- Head-to-head table ---- */
+.h2h-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.h2h-table th,
+.h2h-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--surface-2);
+  text-align: left;
+}
+.h2h-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+.h2h-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.h2h-table .good {
+  color: var(--success);
+  font-weight: 700;
+}
+.h2h-table .bad {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 /* ---- Toast ---- */
 .toast {
   position: fixed;
