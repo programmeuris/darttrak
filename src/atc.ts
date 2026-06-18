@@ -1,4 +1,4 @@
-import type { AtcRing, Leg, Turn } from './types';
+import type { AtcRing, Leg, Match, Turn } from './types';
 
 /** Target sequence: 1 → 20, then the bull (25) to finish. */
 export const ATC_SEQUENCE: readonly number[] = [
@@ -101,4 +101,95 @@ export function atcFewestDartsToComplete(legs: Leg[], playerId: string): number 
     if (darts > 0 && (best === 0 || darts < best)) best = darts;
   }
   return best;
+}
+
+// ---- Cross-match analytics (per ring/variant) ----
+
+export const ATC_RING_ORDER: readonly AtcRing[] = ['single', 'double', 'triple', 'progressive'];
+
+function ringOf(match: Match): AtcRing {
+  return match.atcRing ?? 'single';
+}
+
+function playerDartsInLeg(leg: Leg, playerId: string): number {
+  return leg.turns
+    .filter((t) => t.playerId === playerId)
+    .reduce((acc, t) => acc + t.darts.length, 0);
+}
+
+/** Completed Around the Clock matches the player took part in, oldest → newest. */
+export function atcMatchesFor(matches: Match[], playerId: string): Match[] {
+  return matches
+    .filter(
+      (m) =>
+        m.status === 'completed' &&
+        m.gameType === 'AroundTheClock' &&
+        m.playerIds.includes(playerId),
+    )
+    .sort((a, b) => a.date - b.date);
+}
+
+export interface AtcVariantStats {
+  ring: AtcRing;
+  played: number;
+  won: number;
+  winRate: number;
+  hitRate: number;
+  fewestToClear: number; // fewest darts to clear a leg
+  avgDartsToClear: number; // mean darts per leg the player won
+}
+
+/** Per-ring/variant summary across the player's Around the Clock matches. */
+export function atcStatsByVariant(matches: Match[], playerId: string): AtcVariantStats[] {
+  const all = atcMatchesFor(matches, playerId);
+  const out: AtcVariantStats[] = [];
+  for (const ring of ATC_RING_ORDER) {
+    const group = all.filter((m) => ringOf(m) === ring);
+    if (group.length === 0) continue;
+    const legs = group.flatMap((m) => m.legs);
+    const won = group.filter((m) => m.winnerId === playerId).length;
+    const wonLegDarts = legs
+      .filter((l) => l.winnerId === playerId)
+      .map((l) => playerDartsInLeg(l, playerId))
+      .filter((d) => d > 0);
+    out.push({
+      ring,
+      played: group.length,
+      won,
+      winRate: (won / group.length) * 100,
+      hitRate: atcHitRate(legs, playerId),
+      fewestToClear: wonLegDarts.length ? Math.min(...wonLegDarts) : 0,
+      avgDartsToClear: wonLegDarts.length
+        ? wonLegDarts.reduce((a, b) => a + b, 0) / wonLegDarts.length
+        : 0,
+    });
+  }
+  return out;
+}
+
+export interface AtcMatchPoint {
+  date: number;
+  label: string;
+  ring: AtcRing;
+  hitRate: number;
+  avgDartsToClear: number;
+}
+
+/** Per-match hit rate and darts-to-clear over time (for trend charts). */
+export function atcPerMatch(matches: Match[], playerId: string): AtcMatchPoint[] {
+  return atcMatchesFor(matches, playerId).map((m) => {
+    const wonLegDarts = m.legs
+      .filter((l) => l.winnerId === playerId)
+      .map((l) => playerDartsInLeg(l, playerId))
+      .filter((d) => d > 0);
+    return {
+      date: m.date,
+      label: new Date(m.date).toLocaleDateString(),
+      ring: ringOf(m),
+      hitRate: atcHitRate(m.legs, playerId),
+      avgDartsToClear: wonLegDarts.length
+        ? wonLegDarts.reduce((a, b) => a + b, 0) / wonLegDarts.length
+        : 0,
+    };
+  });
 }

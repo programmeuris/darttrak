@@ -747,6 +747,15 @@ body {
   font-size: 1.05rem;
 }
 
+.ring-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
 /* ---- Head-to-head table ---- */
 .h2h-table {
   width: 100%;

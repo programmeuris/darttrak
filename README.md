@@ -17,8 +17,9 @@ connections — all data is stored in your browser via **IndexedDB**.
 - **Match summary** with per-player 3-dart average, highest turn, 180s, 100+/140+
   counts, darts thrown, checkout % and best checkout
 - **Match history** with player / game-type filters and full turn-by-turn breakdowns
-- **Player stats** with Chart.js: average-per-match line chart and score
-  distribution bar chart
+- **Player stats** with Chart.js, in tabs: Overview, Consistency, Finishing,
+  Scoring, Head-to-Head, and a dedicated **Around the Clock** tab split by
+  ring/variant (hit-rate trend and average darts-to-clear)
 - **Backup & restore**: export all data to JSON and re-import it (your only backup)
 - **Installable PWA** — works offline once loaded; "Add to Home Screen" on
   Chrome / Safari
@@ -97,5 +98,5 @@ npx esbuild scripts/test-scoring.ts --bundle --platform=node --format=esm \
 
 ## Stretch goals (not yet implemented)
 
-Cricket mode, dedicated Around the Clock analytics, checkout suggestions, sound effects, and
+Cricket mode, checkout suggestions, sound effects, and
 local-network multi-device sync.
