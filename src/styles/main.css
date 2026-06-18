@@ -359,6 +359,21 @@ body {
   border-radius: 999px;
   transition: width 0.2s ease;
 }
+.checkout-hint {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  background: rgba(15, 155, 88, 0.12);
+  border: 1px solid rgba(15, 155, 88, 0.4);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+}
+.checkout-hint strong {
+  color: var(--success);
+  font-size: 1.05rem;
+  letter-spacing: 0.3px;
+}
+
 .atc-aim {
   text-align: center;
   color: var(--muted);

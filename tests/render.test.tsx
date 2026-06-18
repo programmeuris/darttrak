@@ -7,7 +7,7 @@ import { Setup } from '../src/screens/Setup';
 import { PlayerStats } from '../src/screens/PlayerStats';
 import { Live } from '../src/screens/Live';
 import { addPlayer, saveMatch, getMatch, importAllData } from '../src/db';
-import { makeMatch, makeLeg } from './helpers';
+import { makeMatch, makeLeg, makeTurn, S } from './helpers';
 
 afterEach(async () => {
   cleanup();
@@ -71,5 +71,22 @@ describe('screens render without crashing', () => {
       const saved = await getMatch('m-live');
       expect(saved!.legs[0].turns).toHaveLength(1);
     });
+  });
+
+  it('Live shows a checkout suggestion when the player is on a finish', async () => {
+    const bob = await addPlayer('Bob');
+    // A prior turn leaves Bob on 40 → suggested finish is D20.
+    const match = makeMatch({
+      id: 'm-co',
+      gameType: '501',
+      playerIds: [bob.id],
+      doubleOut: true,
+      status: 'in_progress',
+      legs: [makeLeg('m-co', [makeTurn(bob.id, [S(20)], 40)])],
+    });
+    await saveMatch(match);
+
+    render(<Live matchId="m-co" />);
+    expect(await screen.findByText('D20')).toBeTruthy();
   });
 });
