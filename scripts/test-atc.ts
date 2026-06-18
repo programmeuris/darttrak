@@ -92,5 +92,30 @@ const wonLeg: Leg = {
 eq('fewest to clear B', atcFewestDartsToComplete([wonLeg], B), 21);
 eq('fewest to clear A (none)', atcFewestDartsToComplete([wonLeg], A), 0);
 
+// ---- Progressive advancement: single +1, double +2, treble +3 ----
+// Start on target 4 (progress 3). Treble of 5 from progress 4 → +3.
+const step = (target: number, steps: number): DartThrow => ({
+  score: steps,
+  label: steps === 0 ? `✗${target}` : steps === 2 ? `D${target}` : steps === 3 ? `T${target}` : `${target}`,
+  isDouble: false,
+});
+// Progressive: hit 1 (+1 → progress 1), double 2 (+2 → progress 3), treble 4 (+3 → progress 6)
+const progLeg: Leg = {
+  id: 'P1',
+  matchId: 'M1',
+  winnerId: null,
+  turns: [
+    turn(A, [step(1, 1), step(2, 2), step(4, 3)], 6), // 1 + 2 + 3 = 6 advanced
+  ],
+};
+eq('progressive progress', atcProgress(progLeg, A), 6);
+// Three darts, all hits (score > 0) → 3 hits even though 6 targets cleared.
+eq('progressive hits counts darts', atcHits([progLeg], A), 3);
+eq('progressive darts thrown', atcDartsThrown([progLeg], A), 3);
+// Double on target 4 → +2 → next target index 5 → number 6 (the user's rule).
+eq('double advances +2', atcTargetForProgress(3 + 2), 6);
+// Treble on target 5 (index 4) → +3 → next index 7 → number 8.
+eq('treble advances +3', atcTargetForProgress(4 + 3), 8);
+
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`);
 if (failed > 0) process.exit(1);

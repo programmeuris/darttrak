@@ -20,6 +20,7 @@ const RINGS: { ring: AtcRing; label: string }[] = [
   { ring: 'single', label: 'Singles' },
   { ring: 'double', label: 'Doubles' },
   { ring: 'triple', label: 'Trebles' },
+  { ring: 'progressive', label: 'Progressive' },
 ];
 
 export async function renderSetup(root: HTMLElement): Promise<void> {
@@ -143,7 +144,7 @@ export async function renderSetup(root: HTMLElement): Promise<void> {
   const ringCard = el('section', { class: 'card' }, [
     el('h2', { class: 'card-title' }, ['Ring']),
     el('p', { class: 'muted' }, [
-      'Which ring counts as a hit. Same hit/miss play — tracked separately in your stats.',
+      'Which ring counts as a hit. Progressive lets any ring hit, but doubles advance +2 and trebles +3. Tracked separately in your stats.',
     ]),
     el('div', { class: 'chip-row' }, ringButtons),
   ]);

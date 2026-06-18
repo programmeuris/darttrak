@@ -78,8 +78,20 @@ export async function renderLiveAtc(root: HTMLElement, matchId: string): Promise
   render(root, state);
 }
 
+/** Total targets advanced by the darts so far (sum of per-dart steps). */
 function hitsIn(darts: DartThrow[]): number {
   return darts.reduce((acc, d) => acc + d.score, 0);
+}
+
+/** Label for a dart that advanced the given number of steps at a target. */
+function dartLabel(target: number, steps: number, ring: AtcRing): string {
+  if (steps === 0) return `✗${atcTargetLabel(target, ring)}`;
+  if (ring === 'progressive') {
+    if (target === 25) return steps === 2 ? 'DB' : 'Bull';
+    const prefix = steps === 2 ? 'D' : steps === 3 ? 'T' : '';
+    return `${prefix}${target}`;
+  }
+  return `✓${atcTargetLabel(target, ring)}`;
 }
 
 function render(root: HTMLElement, state: AtcState): void {
@@ -139,13 +151,12 @@ function render(root: HTMLElement, state: AtcState): void {
   const currentTargetNum = ATC_SEQUENCE[Math.min(liveProgress, ATC_TARGET_COUNT - 1)];
   const currentTargetLabel = hasWon ? '—' : atcTargetLabel(currentTargetNum, ring);
 
-  function addDart(isHit: boolean): void {
+  function addStep(steps: number): void {
     if (inputLocked) return;
     const progressNow = Math.min(startProgress + hitsIn(currentDarts), ATC_TARGET_COUNT);
     if (progressNow >= ATC_TARGET_COUNT) return;
     const target = ATC_SEQUENCE[progressNow];
-    const label = `${isHit ? '✓' : '✗'}${atcTargetLabel(target, ring)}`;
-    currentDarts.push({ score: isHit ? 1 : 0, label, isDouble: false });
+    currentDarts.push({ score: steps, label: dartLabel(target, steps, ring), isDouble: false });
     render(root, state);
   }
 
@@ -213,6 +224,25 @@ function render(root: HTMLElement, state: AtcState): void {
     render(root, state);
   }
 
+  // ---- Input buttons (vary by variant) ----
+  const onBull = !hasWon && currentTargetNum === 25;
+  const inputButtons =
+    ring === 'progressive'
+      ? el('div', { class: 'atc-prog-actions' }, [
+          el('button', { class: 'btn miss-btn', disabled: inputLocked, onClick: () => addStep(0) }, ['Miss ✗']),
+          el('button', { class: 'btn hit-btn', disabled: inputLocked, onClick: () => addStep(1) }, ['Hit +1']),
+          el('button', { class: 'btn hit-btn', disabled: inputLocked, onClick: () => addStep(2) }, ['Double +2']),
+          el(
+            'button',
+            { class: 'btn hit-btn', disabled: inputLocked || onBull, onClick: () => addStep(3) },
+            ['Treble +3'],
+          ),
+        ])
+      : el('div', { class: 'live-actions' }, [
+          el('button', { class: 'btn hit-btn', disabled: inputLocked, onClick: () => addStep(1) }, ['HIT ✓']),
+          el('button', { class: 'btn miss-btn', disabled: inputLocked, onClick: () => addStep(0) }, ['MISS ✗']),
+        ]);
+
   // ---- Turn log ----
   const allTurns: { turn: Turn; legIndex: number }[] = [];
   match.legs.forEach((l, li) => l.turns.forEach((t) => allTurns.push({ turn: t, legIndex: li })));
@@ -257,20 +287,12 @@ function render(root: HTMLElement, state: AtcState): void {
       el('div', { class: 'atc-aim' }, [
         `${playerNames.get(turnPlayer)} — aim for `,
         el('strong', {}, [currentTargetLabel]),
+        ring === 'progressive'
+          ? el('span', { class: 'atc-hint' }, [' · double +2 · treble +3'])
+          : null,
       ]),
       el('div', { class: 'dart-slots' }, dartSlots),
-      el('div', { class: 'live-actions' }, [
-        el(
-          'button',
-          { class: 'btn hit-btn', disabled: inputLocked, onClick: () => addDart(true) },
-          ['HIT ✓'],
-        ),
-        el(
-          'button',
-          { class: 'btn miss-btn', disabled: inputLocked, onClick: () => addDart(false) },
-          ['MISS ✗'],
-        ),
-      ]),
+      inputButtons,
       el('div', { class: 'live-actions' }, [
         el(
           'button',

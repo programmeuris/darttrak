@@ -7,10 +7,22 @@ export const ATC_SEQUENCE: readonly number[] = [
 export const ATC_TARGET_COUNT = ATC_SEQUENCE.length; // 21
 
 export function atcRingLabel(ring: AtcRing): string {
-  return ring === 'double' ? 'Doubles' : ring === 'triple' ? 'Trebles' : 'Singles';
+  switch (ring) {
+    case 'double':
+      return 'Doubles';
+    case 'triple':
+      return 'Trebles';
+    case 'progressive':
+      return 'Progressive';
+    default:
+      return 'Singles';
+  }
 }
 
-/** Display label for a target given the required ring (e.g. "T7", "D15", "Bull"). */
+/**
+ * Display label for the *target* a player is aiming at. In single/progressive
+ * the target is plain ("7"); double/triple show the required ring ("D7"/"T7").
+ */
 export function atcTargetLabel(target: number, ring: AtcRing): string {
   if (target === 25) {
     // There is no treble bull; a doubles game finishes on the double bull.
@@ -59,8 +71,17 @@ export function atcDartsThrown(legs: Leg[], playerId: string): number {
   return playerTurns(legs, playerId).reduce((acc, t) => acc + t.darts.length, 0);
 }
 
+/**
+ * Number of darts that landed a hit. Counts darts (score > 0) rather than
+ * summing Turn.totalScore, so it stays correct in progressive mode where one
+ * dart can advance the target by 2 or 3.
+ */
 export function atcHits(legs: Leg[], playerId: string): number {
-  return playerTurns(legs, playerId).reduce((acc, t) => acc + t.totalScore, 0);
+  let hits = 0;
+  for (const turn of playerTurns(legs, playerId)) {
+    for (const dart of turn.darts) if (dart.score > 0) hits++;
+  }
+  return hits;
 }
 
 export function atcHitRate(legs: Leg[], playerId: string): number {

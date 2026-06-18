@@ -368,6 +368,19 @@ body {
   color: var(--text);
   font-size: 1.2rem;
 }
+.atc-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.atc-prog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.atc-prog-actions .btn {
+  min-height: 60px;
+  font-size: 1.05rem;
+}
 .dart-slot.hit {
   border-color: var(--success);
   color: var(--success);
