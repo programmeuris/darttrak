@@ -13,7 +13,8 @@ external connections — all data is stored in your browser via **IndexedDB**.
 - **1–4 players** per match, drawn from a saved roster
 - **Live scoring** screen optimised for mobile: large tap targets, segmented
   multiplier numpad (Single / Double / Treble + Bull + Miss), real-time bust and
-  checkout detection, undo-dart and undo-turn
+  checkout detection, **checkout suggestions** (e.g. "T20 · T20 · Bull" that
+  update as you throw), undo-dart and undo-turn
 - **Match summary** with per-player 3-dart average, highest turn, 180s, 100+/140+
   counts, darts thrown, checkout % and best checkout
 - **Match history** with player / game-type filters and full turn-by-turn breakdowns
@@ -109,5 +110,5 @@ smoke-tests for the React screens.
 
 ## Stretch goals (not yet implemented)
 
-Cricket mode, checkout suggestions, sound effects, and
+Cricket mode, sound effects, and
 local-network multi-device sync.

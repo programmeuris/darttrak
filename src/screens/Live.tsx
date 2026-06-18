@@ -3,6 +3,7 @@ import { navigate } from '../router';
 import { toast, confirmDialog } from '../toast';
 import { getMatch, getPlayers, saveMatch } from '../db';
 import { startingScore, evaluateTurn, isBust, isWinningTurn } from '../scoring';
+import { suggestCheckout } from '../checkout';
 import { uuid } from '../db';
 import type { Match, Leg, Turn, DartThrow, Player } from '../types';
 
@@ -81,6 +82,13 @@ export function Live({ matchId }: { matchId: string }) {
   const projected = startRemaining - turnTotal;
   const inputLocked = currentDarts.length >= 3 || outcome === 'bust' || outcome === 'win';
   const nameOf = (id: string) => names.get(id) ?? '?';
+
+  // Suggested finish for the player on throw (x01 double-out only), updating as
+  // darts are thrown this turn.
+  const checkout =
+    match.doubleOut && outcome === 'ok' && currentDarts.length < 3
+      ? suggestCheckout(projected, 3 - currentDarts.length)
+      : null;
 
   function addDart(base: number, isBull: boolean) {
     if (currentDarts.length >= 3) return;
@@ -226,6 +234,12 @@ export function Live({ matchId }: { matchId: string }) {
       {outcome === 'bust' && <div className="banner bust">BUST — confirm to end turn</div>}
       {outcome === 'win' && (
         <div className="banner win">{nameOf(turnPlayer)} checks out! Confirm to win the leg.</div>
+      )}
+
+      {checkout && (
+        <div className="checkout-hint">
+          Checkout: <strong>{checkout.join(' · ')}</strong>
+        </div>
       )}
 
       <div className="dart-slots">
