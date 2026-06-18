@@ -3,6 +3,7 @@ import {
   calculateAverage,
   count180s,
   bestCheckout,
+  isX01,
 } from './scoring';
 
 export interface PlayerOverview {
@@ -16,8 +17,13 @@ export interface PlayerOverview {
 }
 
 function completedMatchesFor(matches: Match[], playerId: string): Match[] {
+  // x01 only — Cricket / Around the Clock reuse the same fields with different
+  // meaning and would distort these point-based metrics.
   return matches.filter(
-    (m) => m.status === 'completed' && m.playerIds.includes(playerId),
+    (m) =>
+      m.status === 'completed' &&
+      isX01(m.gameType) &&
+      m.playerIds.includes(playerId),
   );
 }
 

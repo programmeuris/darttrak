@@ -1,12 +1,21 @@
 import type { Match, Leg, Turn } from './types';
-import { calculateAverage } from './scoring';
+import { calculateAverage, isX01 } from './scoring';
 
 // ---- shared helpers ----
 
-/** Completed matches that include the player, oldest → newest. */
+/**
+ * Completed x01 matches that include the player, oldest → newest. Non-x01 modes
+ * (Cricket / Around the Clock) are excluded — every metric here assumes x01
+ * point semantics and would be skewed by them.
+ */
 function playerMatches(matches: Match[], playerId: string): Match[] {
   return matches
-    .filter((m) => m.status === 'completed' && m.playerIds.includes(playerId))
+    .filter(
+      (m) =>
+        m.status === 'completed' &&
+        isX01(m.gameType) &&
+        m.playerIds.includes(playerId),
+    )
     .sort((a, b) => a.date - b.date);
 }
 
