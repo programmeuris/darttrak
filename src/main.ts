@@ -3,9 +3,11 @@ import { parseRoute, navigate } from './router';
 import { renderHome } from './screens/home';
 import { renderSetup } from './screens/setup';
 import { renderLive } from './screens/live';
+import { renderLiveAtc } from './screens/liveAtc';
 import { renderSummary } from './screens/summary';
 import { renderHistory } from './screens/history';
 import { renderPlayerStats } from './screens/playerStats';
+import { getMatch } from './db';
 import { toast } from './ui';
 
 const root = document.getElementById('app')!;
@@ -20,10 +22,16 @@ async function render(): Promise<void> {
       case 'setup':
         await renderSetup(root);
         break;
-      case 'live':
+      case 'live': {
         if (!params[0]) return navigate('/');
-        await renderLive(root, params[0]);
+        const liveMatch = await getMatch(params[0]);
+        if (liveMatch?.gameType === 'AroundTheClock') {
+          await renderLiveAtc(root, params[0]);
+        } else {
+          await renderLive(root, params[0]);
+        }
         break;
+      }
       case 'summary':
         if (!params[0]) return navigate('/');
         await renderSummary(root, params[0]);

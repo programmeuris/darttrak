@@ -10,6 +10,13 @@ import {
   bestCheckout,
   totalDartsThrown,
 } from '../scoring';
+import {
+  atcDartsThrown,
+  atcHits,
+  atcHitRate,
+  atcFewestDartsToComplete,
+  atcRingLabel,
+} from '../atc';
 import type { Player } from '../types';
 
 export async function renderSummary(root: HTMLElement, matchId: string): Promise<void> {
@@ -24,15 +31,36 @@ export async function renderSummary(root: HTMLElement, matchId: string): Promise
   const nameOf = (id: string) => names.get(id) ?? 'Unknown';
 
   const winnerName = match.winnerId ? nameOf(match.winnerId) : '—';
+  const isAtc = match.gameType === 'AroundTheClock';
+
+  const subtitle = isAtc
+    ? `Around the Clock · ${atcRingLabel(match.atcRing ?? 'single')} · Best of ${match.format.legs}`
+    : `${match.gameType} · Best of ${match.format.legs} · ${match.doubleOut ? 'Double Out' : 'Straight Out'}`;
 
   const playerCards = match.playerIds.map((id) => {
-    const avg = calculateAverage(match.legs, id);
-    const high = calculateHighestTurn(match.legs, id);
-    const c180 = count180s(match.legs, id);
-    const hs = countHighScores(match.legs, id);
-    const checkoutPct = calculateCheckoutPercent(match.legs, id);
-    const best = bestCheckout(match.legs, id);
-    const darts = totalDartsThrown(match.legs, id);
+    const rows: [string, string][] = isAtc
+      ? (() => {
+          const fewest = atcFewestDartsToComplete(match.legs, id);
+          return [
+            ['Darts Thrown', String(atcDartsThrown(match.legs, id))],
+            ['Hits', String(atcHits(match.legs, id))],
+            ['Hit %', `${atcHitRate(match.legs, id).toFixed(0)}%`],
+            ['Fewest to Clear', fewest > 0 ? String(fewest) : '—'],
+          ];
+        })()
+      : (() => {
+          const hs = countHighScores(match.legs, id);
+          return [
+            ['3-Dart Avg', calculateAverage(match.legs, id).toFixed(1)],
+            ['Highest Turn', String(calculateHighestTurn(match.legs, id))],
+            ['180s', String(count180s(match.legs, id))],
+            ['100+', String(hs.over100)],
+            ['140+', String(hs.over140)],
+            ['Darts Thrown', String(totalDartsThrown(match.legs, id))],
+            ['Checkout %', `${calculateCheckoutPercent(match.legs, id).toFixed(0)}%`],
+            ['Best Checkout', bestCheckout(match.legs, id) > 0 ? String(bestCheckout(match.legs, id)) : '—'],
+          ];
+        })();
 
     return el(
       'section',
@@ -42,16 +70,7 @@ export async function renderSummary(root: HTMLElement, matchId: string): Promise
           nameOf(id),
           id === match.winnerId ? el('span', { class: 'badge' }, [' 🏆 Winner']) : null,
         ]),
-        statGrid([
-          ['3-Dart Avg', avg.toFixed(1)],
-          ['Highest Turn', String(high)],
-          ['180s', String(c180)],
-          ['100+', String(hs.over100)],
-          ['140+', String(hs.over140)],
-          ['Darts Thrown', String(darts)],
-          ['Checkout %', `${checkoutPct.toFixed(0)}%`],
-          ['Best Checkout', best > 0 ? String(best) : '—'],
-        ]),
+        statGrid(rows),
       ],
     );
   });
@@ -63,9 +82,7 @@ export async function renderSummary(root: HTMLElement, matchId: string): Promise
       el('section', { class: 'card winner-banner' }, [
         el('div', { class: 'winner-label' }, ['Winner']),
         el('div', { class: 'winner-name' }, [`🏆 ${winnerName}`]),
-        el('div', { class: 'muted' }, [
-          `${match.gameType} · Best of ${match.format.legs} · ${match.doubleOut ? 'Double Out' : 'Straight Out'}`,
-        ]),
+        el('div', { class: 'muted' }, [subtitle]),
       ]),
       ...playerCards,
       el('div', { class: 'add-row' }, [

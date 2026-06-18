@@ -2,6 +2,7 @@ import { el, mount, header, toast, confirmDialog } from '../ui';
 import { navigate } from '../router';
 import { getAllMatches, getPlayers, getMatch, deleteMatch } from '../db';
 import { startingScore } from '../scoring';
+import { ATC_TARGET_COUNT, atcRingLabel } from '../atc';
 import type { Player, GameType } from '../types';
 
 export async function renderHistory(root: HTMLElement, matchId?: string): Promise<void> {
@@ -105,6 +106,7 @@ export async function renderHistory(root: HTMLElement, matchId?: string): Promis
       el('option', { value: '' }, ['All games']),
       el('option', { value: '501' }, ['501']),
       el('option', { value: '301' }, ['301']),
+      el('option', { value: 'AroundTheClock' }, ['Around the Clock']),
     ],
   );
 
@@ -132,15 +134,23 @@ async function renderMatchDetail(root: HTMLElement, matchId: string): Promise<vo
   const players = await getPlayers();
   const names = new Map<string, string>(players.map((p: Player) => [p.id, p.name]));
   const nameOf = (id: string) => names.get(id) ?? 'Unknown';
+  const isAtc = match.gameType === 'AroundTheClock';
   const start = startingScore(match.gameType === '301' ? '301' : '501');
+  const cols = isAtc
+    ? ['Player', 'Darts', 'Hits', 'Cleared']
+    : ['Player', 'Darts', 'Scored', 'Left'];
 
   const legSections = match.legs.map((leg, i) => {
     const rows = leg.turns.map((turn) =>
       el('tr', { class: turn.isBust ? 'bust' : '' }, [
         el('td', {}, [nameOf(turn.playerId)]),
         el('td', {}, [turn.darts.map((d) => d.label).join(' · ')]),
-        el('td', { class: 'num' }, [turn.isBust ? 'BUST' : String(turn.totalScore)]),
-        el('td', { class: 'num' }, [String(turn.remainingScore)]),
+        el('td', { class: 'num' }, [
+          isAtc ? `+${turn.totalScore}` : turn.isBust ? 'BUST' : String(turn.totalScore),
+        ]),
+        el('td', { class: 'num' }, [
+          isAtc ? `${turn.remainingScore}/${ATC_TARGET_COUNT}` : String(turn.remainingScore),
+        ]),
       ]),
     );
     return el('section', { class: 'card' }, [
@@ -150,12 +160,7 @@ async function renderMatchDetail(root: HTMLElement, matchId: string): Promise<vo
       ]),
       el('table', { class: 'turn-table' }, [
         el('thead', {}, [
-          el('tr', {}, [
-            el('th', {}, ['Player']),
-            el('th', {}, ['Darts']),
-            el('th', { class: 'num' }, ['Scored']),
-            el('th', { class: 'num' }, ['Left']),
-          ]),
+          el('tr', {}, cols.map((c, ci) => el('th', { class: ci >= 2 ? 'num' : '' }, [c]))),
         ]),
         el('tbody', {}, rows.length ? rows : [
           el('tr', {}, [el('td', { colspan: 4, class: 'muted' }, ['No turns'])]),
@@ -175,7 +180,9 @@ async function renderMatchDetail(root: HTMLElement, matchId: string): Promise<vo
         ]),
         el('div', { class: 'match-players' }, [match.playerIds.map(nameOf).join(' vs ')]),
         el('div', { class: 'muted' }, [
-          `Best of ${match.format.legs} · ${match.doubleOut ? 'Double Out' : 'Straight Out'} · Start ${start}`,
+          isAtc
+            ? `Best of ${match.format.legs} · ${atcRingLabel(match.atcRing ?? 'single')}`
+            : `Best of ${match.format.legs} · ${match.doubleOut ? 'Double Out' : 'Straight Out'} · Start ${start}`,
         ]),
         match.status === 'completed'
           ? el('div', { class: 'tag' }, [`🏆 ${match.winnerId ? nameOf(match.winnerId) : '—'}`])

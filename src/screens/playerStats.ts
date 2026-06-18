@@ -12,8 +12,9 @@ import {
   scoringStats,
   headToHead,
 } from '../analysis';
+import { atcStatsByVariant, atcPerMatch, atcRingLabel } from '../atc';
 import { Chart, type ChartDataset } from 'chart.js/auto';
-import type { Player, Match } from '../types';
+import type { Player, Match, AtcRing } from '../types';
 
 const TEXT = '#eaeaea';
 const GRID = 'rgba(234,234,234,0.1)';
@@ -22,7 +23,14 @@ const GREEN = '#0f9b58';
 const BLUE = '#4a8fe0';
 const AMBER = '#f5c451';
 
-type TabId = 'overview' | 'consistency' | 'finishing' | 'scoring' | 'h2h';
+const RING_COLORS: Record<AtcRing, string> = {
+  single: BLUE,
+  double: GREEN,
+  triple: AMBER,
+  progressive: ACCENT,
+};
+
+type TabId = 'overview' | 'consistency' | 'finishing' | 'scoring' | 'h2h' | 'atc';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -30,6 +38,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'finishing', label: 'Finishing' },
   { id: 'scoring', label: 'Scoring' },
   { id: 'h2h', label: 'Head-to-Head' },
+  { id: 'atc', label: 'Around the Clock' },
 ];
 
 let activeCharts: Chart[] = [];
@@ -113,6 +122,9 @@ export async function renderPlayerStats(root: HTMLElement): Promise<void> {
         break;
       case 'h2h':
         renderHeadToHead(panel, matches, state.playerId, names);
+        break;
+      case 'atc':
+        renderAtc(panel, matches, state.playerId);
         break;
     }
   }
@@ -450,6 +462,69 @@ function renderHeadToHead(
       el('p', { class: 'muted' }, ['1-v-1 matches only. "Avg" columns compare 3-dart averages in those games.']),
       table,
     ]),
+  );
+}
+
+// ---- Around the Clock (split by ring/variant) ----
+
+function renderAtc(panel: HTMLElement, matches: Match[], playerId: string): void {
+  const variants = atcStatsByVariant(matches, playerId);
+  if (variants.length === 0) {
+    panel.replaceChildren(emptyNote('No completed Around the Clock matches yet.'));
+    return;
+  }
+
+  const variantCards = variants.map((v) =>
+    el('section', { class: 'card' }, [
+      el('h2', { class: 'card-title' }, [
+        el('span', { class: 'ring-dot', style: `background:${RING_COLORS[v.ring]}` }),
+        ` ${atcRingLabel(v.ring)}`,
+      ]),
+      el('div', { class: 'stat-grid' }, [
+        cell(String(v.played), 'Played'),
+        cell(`${v.winRate.toFixed(0)}%`, 'Win Rate'),
+        cell(`${v.hitRate.toFixed(0)}%`, 'Hit Rate'),
+        cell(v.fewestToClear > 0 ? String(v.fewestToClear) : '—', 'Fewest Darts'),
+        cell(v.avgDartsToClear > 0 ? v.avgDartsToClear.toFixed(0) : '—', 'Avg Darts'),
+      ]),
+    ]),
+  );
+
+  const points = atcPerMatch(matches, playerId);
+  const { card: hitC, canvas: hitCanvas } = chartCard(
+    'Hit % Over Time',
+    'One line per variant — gaps where that variant wasn’t played.',
+  );
+  const { card: dartsC, canvas: dartsCanvas } = chartCard(
+    'Avg Darts to Clear',
+    'Average darts to clear a leg, by variant (lower is better).',
+  );
+
+  panel.replaceChildren(...variantCards, hitC, dartsC);
+
+  // Hit % over time: aligned to all ATC matches, one dataset per variant.
+  const labels = points.map((p) => p.label);
+  const hitDatasets: ChartDataset<'line'>[] = variants.map((v) => ({
+    label: atcRingLabel(v.ring),
+    data: points.map((p) => (p.ring === v.ring ? round(p.hitRate) : null)),
+    borderColor: RING_COLORS[v.ring],
+    backgroundColor: RING_COLORS[v.ring],
+    spanGaps: true,
+    tension: 0.25,
+    pointRadius: 3,
+  }));
+  lineChart(hitCanvas, labels, hitDatasets);
+
+  barChart(
+    dartsCanvas,
+    variants.map((v) => atcRingLabel(v.ring)),
+    [
+      {
+        label: 'Avg darts to clear',
+        data: variants.map((v) => round(v.avgDartsToClear)),
+        backgroundColor: variants.map((v) => RING_COLORS[v.ring]),
+      },
+    ],
   );
 }
 

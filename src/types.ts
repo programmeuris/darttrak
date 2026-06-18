@@ -1,6 +1,15 @@
 export type GameType = '501' | '301' | 'Cricket' | 'AroundTheClock';
 export type MatchStatus = 'in_progress' | 'completed';
 
+/**
+ * Around the Clock scoring variant:
+ * - single / double / triple: the required ring; play is hit/miss, +1 per hit.
+ * - progressive: any ring hits, but the multiplier advances extra — a double
+ *   moves you +2 targets and a treble +3 (single +1).
+ * Stored on the match so analytics can separate variants.
+ */
+export type AtcRing = 'single' | 'double' | 'triple' | 'progressive';
+
 export interface Player {
   id: string; // uuid
   name: string;
@@ -40,6 +49,7 @@ export interface Match {
     sets: number; // e.g. 1 for no sets
   };
   doubleOut: boolean;
+  atcRing?: AtcRing; // only set for Around the Clock matches
   status: MatchStatus;
   legs: Leg[];
 }
