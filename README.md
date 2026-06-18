@@ -30,8 +30,30 @@ npm run preview   # preview the production build
 npm run typecheck # type-check without emitting
 ```
 
-To install as an app: open the production build in Chrome or Safari and choose
-**Add to Home Screen**.
+## Install on your phone (PWA)
+
+The app is deployed automatically to **GitHub Pages** on every push to `main`
+(see `.github/workflows/deploy.yml`). Once Pages is enabled, the live URL is:
+
+```
+https://programmeuris.github.io/darttrak/
+```
+
+To install it as an app — no build tools required:
+
+- **iPhone / iPad (Safari):** open the URL → tap **Share** → **Add to Home Screen**.
+- **Android (Chrome):** open the URL → menu **⋮** → **Install app** / **Add to Home Screen**.
+
+It then launches full-screen and works offline (data stays in that browser's
+IndexedDB; use **Export** on the Home screen to back it up).
+
+### One-time Pages setup
+
+1. Make the repository **public** (Settings → General → Danger Zone → Change visibility).
+   Free GitHub Pages requires a public repo.
+2. Settings → **Pages** → under *Build and deployment*, set **Source = GitHub Actions**.
+3. Push to `main` (or re-run the **Deploy to GitHub Pages** workflow). The site
+   goes live at the URL above.
 
 ## Project structure
 
