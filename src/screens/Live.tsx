@@ -212,7 +212,9 @@ export function Live({ matchId }: { matchId: string }) {
             <div className={`score-card ${isTurn ? 'active' : ''}`} key={id}>
               <div className="sc-top">
                 <span className="sc-name">{nameOf(id)}</span>
-                <span className="sc-legs">{won.get(id) ?? 0} legs</span>
+                <span className="sc-legs">
+                  {won.get(id) ?? 0} {(won.get(id) ?? 0) === 1 ? 'leg' : 'legs'}
+                </span>
               </div>
               <div className="sc-remaining">{displayRem}</div>
               {isTurn && currentDarts.length > 0 && (
