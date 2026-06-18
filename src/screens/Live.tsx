@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../router';
 import { toast, confirmDialog } from '../toast';
 import { getMatch, getPlayers, saveMatch } from '../db';
@@ -41,6 +41,7 @@ export function Live({ matchId }: { matchId: string }) {
   const [names, setNames] = useState<Map<string, string>>(new Map());
   const [currentDarts, setCurrentDarts] = useState<DartThrow[]>([]);
   const [multiplier, setMultiplier] = useState<1 | 2 | 3>(1);
+  const submitting = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -118,43 +119,49 @@ export function Live({ matchId }: { matchId: string }) {
       toast('Throw at least one dart', 'error');
       return;
     }
-    const bust = isBust(startRemaining, currentDarts, match.doubleOut);
-    const win = isWinningTurn(startRemaining, currentDarts, match.doubleOut);
-    const total = currentDarts.reduce((a, d) => a + d.score, 0);
+    if (submitting.current) return; // guard against double-tap recording the turn twice
+    submitting.current = true;
+    try {
+      const bust = isBust(startRemaining, currentDarts, match.doubleOut);
+      const win = isWinningTurn(startRemaining, currentDarts, match.doubleOut);
+      const total = currentDarts.reduce((a, d) => a + d.score, 0);
 
-    const next = structuredClone(match);
-    const nextLeg = activeLeg(next);
-    nextLeg.turns.push({
-      playerId: turnPlayer,
-      darts: [...currentDarts],
-      totalScore: total,
-      remainingScore: bust ? startRemaining : startRemaining - total,
-      isBust: bust,
-      timestamp: Date.now(),
-    } satisfies Turn);
-    setCurrentDarts([]);
-    setMultiplier(1);
+      const next = structuredClone(match);
+      const nextLeg = activeLeg(next);
+      nextLeg.turns.push({
+        playerId: turnPlayer,
+        darts: [...currentDarts],
+        totalScore: total,
+        remainingScore: bust ? startRemaining : startRemaining - total,
+        isBust: bust,
+        timestamp: Date.now(),
+      } satisfies Turn);
+      setCurrentDarts([]);
+      setMultiplier(1);
 
-    if (win) {
-      nextLeg.winnerId = turnPlayer;
-      if ((legsWonBy(next).get(turnPlayer) ?? 0) >= legsToWin(next)) {
-        next.winnerId = turnPlayer;
-        next.status = 'completed';
+      if (win) {
+        nextLeg.winnerId = turnPlayer;
+        if ((legsWonBy(next).get(turnPlayer) ?? 0) >= legsToWin(next)) {
+          next.winnerId = turnPlayer;
+          next.status = 'completed';
+          await saveMatch(next);
+          toast(`${nameOf(turnPlayer)} wins the match!`);
+          navigate(`/summary/${next.id}`);
+          return;
+        }
+        next.legs.push({ id: uuid(), matchId: next.id, winnerId: null, turns: [] });
         await saveMatch(next);
-        toast(`${nameOf(turnPlayer)} wins the match!`);
-        navigate(`/summary/${next.id}`);
+        toast(`${nameOf(turnPlayer)} wins the leg!`);
+        setMatch(next);
         return;
       }
-      next.legs.push({ id: uuid(), matchId: next.id, winnerId: null, turns: [] });
-      await saveMatch(next);
-      toast(`${nameOf(turnPlayer)} wins the leg!`);
-      setMatch(next);
-      return;
-    }
 
-    await saveMatch(next);
-    if (bust) toast('Bust!');
-    setMatch(next);
+      await saveMatch(next);
+      if (bust) toast('Bust!');
+      setMatch(next);
+    } finally {
+      submitting.current = false;
+    }
   }
 
   async function undoLastTurn() {

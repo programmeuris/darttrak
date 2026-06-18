@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../router';
 import { toast, confirmDialog } from '../toast';
 import { getMatch, getPlayers, saveMatch, uuid } from '../db';
@@ -48,6 +48,7 @@ export function LiveAtc({ matchId }: { matchId: string }) {
   const [match, setMatch] = useState<Match | null>(null);
   const [names, setNames] = useState<Map<string, string>>(new Map());
   const [currentDarts, setCurrentDarts] = useState<DartThrow[]>([]);
+  const submitting = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -86,6 +87,8 @@ export function LiveAtc({ matchId }: { matchId: string }) {
   const hasWon = liveProgress >= ATC_TARGET_COUNT;
   const inputLocked = currentDarts.length >= 3 || hasWon;
   const currentTargetNum = ATC_SEQUENCE[Math.min(liveProgress, ATC_TARGET_COUNT - 1)];
+  // The bull only has an outer (25) and inner/double (50) — no treble — so the
+  // +3 button is disabled once the target reaches the bull.
   const onBull = !hasWon && currentTargetNum === 25;
   const nameOf = (id: string) => names.get(id) ?? '?';
 
@@ -102,38 +105,44 @@ export function LiveAtc({ matchId }: { matchId: string }) {
       toast('Record at least one dart', 'error');
       return;
     }
-    const hits = hitsIn(currentDarts);
-    const newProgress = Math.min(startProgress + hits, ATC_TARGET_COUNT);
-    const next = structuredClone(match);
-    const nextLeg = activeLeg(next);
-    nextLeg.turns.push({
-      playerId: turnPlayer,
-      darts: [...currentDarts],
-      totalScore: hits,
-      remainingScore: newProgress,
-      isBust: false,
-      timestamp: Date.now(),
-    } satisfies Turn);
-    setCurrentDarts([]);
+    if (submitting.current) return; // guard against double-tap recording the turn twice
+    submitting.current = true;
+    try {
+      const hits = hitsIn(currentDarts);
+      const newProgress = Math.min(startProgress + hits, ATC_TARGET_COUNT);
+      const next = structuredClone(match);
+      const nextLeg = activeLeg(next);
+      nextLeg.turns.push({
+        playerId: turnPlayer,
+        darts: [...currentDarts],
+        totalScore: hits,
+        remainingScore: newProgress,
+        isBust: false,
+        timestamp: Date.now(),
+      } satisfies Turn);
+      setCurrentDarts([]);
 
-    if (newProgress >= ATC_TARGET_COUNT) {
-      nextLeg.winnerId = turnPlayer;
-      if ((legsWonBy(next).get(turnPlayer) ?? 0) >= legsToWin(next)) {
-        next.winnerId = turnPlayer;
-        next.status = 'completed';
+      if (newProgress >= ATC_TARGET_COUNT) {
+        nextLeg.winnerId = turnPlayer;
+        if ((legsWonBy(next).get(turnPlayer) ?? 0) >= legsToWin(next)) {
+          next.winnerId = turnPlayer;
+          next.status = 'completed';
+          await saveMatch(next);
+          toast(`${nameOf(turnPlayer)} wins the match!`);
+          navigate(`/summary/${next.id}`);
+          return;
+        }
+        next.legs.push({ id: uuid(), matchId: next.id, winnerId: null, turns: [] });
         await saveMatch(next);
-        toast(`${nameOf(turnPlayer)} wins the match!`);
-        navigate(`/summary/${next.id}`);
+        toast(`${nameOf(turnPlayer)} wins the leg!`);
+        setMatch(next);
         return;
       }
-      next.legs.push({ id: uuid(), matchId: next.id, winnerId: null, turns: [] });
       await saveMatch(next);
-      toast(`${nameOf(turnPlayer)} wins the leg!`);
       setMatch(next);
-      return;
+    } finally {
+      submitting.current = false;
     }
-    await saveMatch(next);
-    setMatch(next);
   }
 
   async function undoLastTurn() {
