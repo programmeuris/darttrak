@@ -62,15 +62,47 @@ describe('screens render without crashing', () => {
     expect(await screen.findByText('Alice')).toBeTruthy();
     expect(screen.getByText('501')).toBeTruthy();
 
-    // Enter a dart, then double-click Confirm — the guard must record only one turn.
-    fireEvent.click(screen.getByText('20'));
-    const confirm = screen.getByText('Confirm Turn');
+    // A turn is three darts: confirm stays disabled until all three are thrown.
+    fireEvent.click(screen.getByRole('button', { name: '20' }));
+    expect((screen.getByText('Confirm Turn (1/3)') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '20' }));
+    fireEvent.click(screen.getByRole('button', { name: '20' }));
+
+    // Now enabled; double-click Confirm — the guard must record only one turn.
+    const confirm = screen.getByText('Confirm Turn (3/3)');
     fireEvent.click(confirm);
     fireEvent.click(confirm);
 
     await waitFor(async () => {
       const saved = await getMatch('m-live');
       expect(saved!.legs[0].turns).toHaveLength(1);
+    });
+  });
+
+  it('Live lets a checkout win confirm with fewer than three darts', async () => {
+    const bob = await addPlayer('Bob');
+    // Bob sits on 40 → D20 checks out on a single dart.
+    const match = makeMatch({
+      id: 'm-co-win',
+      gameType: '501',
+      playerIds: [bob.id],
+      doubleOut: true,
+      status: 'in_progress',
+      legs: [makeLeg('m-co-win', [makeTurn(bob.id, [S(20)], 40)])],
+    });
+    await saveMatch(match);
+
+    render(<Live matchId="m-co-win" />);
+    fireEvent.click(await screen.findByText('Double'));
+    fireEvent.click(screen.getByRole('button', { name: '20' }));
+
+    const confirm = screen.getByText('Confirm Win') as HTMLButtonElement;
+    expect(confirm.disabled).toBe(false);
+    fireEvent.click(confirm);
+    await waitFor(async () => {
+      const saved = await getMatch('m-co-win');
+      expect(saved!.status).toBe('completed');
+      expect(saved!.winnerId).toBe(bob.id);
     });
   });
 
