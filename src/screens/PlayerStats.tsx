@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import 'chart.js/auto';
 import { Line, Bar } from 'react-chartjs-2';
 import type { ChartData, ChartDataset, ChartOptions } from 'chart.js';
@@ -86,13 +86,15 @@ function Empty({ text }: { text: string }) {
 }
 
 type TabId = 'overview' | 'consistency' | 'finishing' | 'scoring' | 'h2h' | 'atc';
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'consistency', label: 'Consistency' },
-  { id: 'finishing', label: 'Finishing' },
-  { id: 'scoring', label: 'Scoring' },
-  { id: 'h2h', label: 'Head-to-Head' },
-  { id: 'atc', label: 'Around the Clock' },
+// `group` splits the x01 categories from the other-gamemode categories so the
+// tab bar can show a separator at the boundary (the ATC tab is x01-irrelevant).
+const TABS: { id: TabId; label: string; group: 'x01' | 'mode' }[] = [
+  { id: 'overview', label: 'Overview', group: 'x01' },
+  { id: 'consistency', label: 'Consistency', group: 'x01' },
+  { id: 'finishing', label: 'Finishing', group: 'x01' },
+  { id: 'scoring', label: 'Scoring', group: 'x01' },
+  { id: 'h2h', label: 'Head-to-Head', group: 'x01' },
+  { id: 'atc', label: 'Around the Clock', group: 'mode' },
 ];
 
 export function PlayerStats() {
@@ -135,10 +137,13 @@ export function PlayerStats() {
       </section>
 
       <div className="tab-bar">
-        {TABS.map((t) => (
-          <button key={t.id} className={`tab ${t.id === tab ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-            {t.label}
-          </button>
+        {TABS.map((t, i) => (
+          <Fragment key={t.id}>
+            {i > 0 && TABS[i - 1].group !== t.group && <span className="tab-sep" aria-hidden="true" />}
+            <button className={`tab ${t.id === tab ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+              {t.label}
+            </button>
+          </Fragment>
         ))}
       </div>
 

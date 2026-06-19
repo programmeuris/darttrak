@@ -78,7 +78,7 @@ export function Home() {
   return (
     <div className="screen">
       <header className="screen-header center">
-        <h1 className="app-title">🎯 Darts Tracker</h1>
+        <h1 className="app-title">🎯 DartTrak</h1>
       </header>
 
       <div className="home-actions">

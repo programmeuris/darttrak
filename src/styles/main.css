@@ -34,7 +34,10 @@ body {
 }
 
 .screen {
-  padding: 12px 14px calc(40px + env(safe-area-inset-bottom));
+  /* Pad for the device's safe areas so the UI clears the notch / front camera
+     (top) and rounded corners (sides) when installed full-screen. */
+  padding: calc(12px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right))
+    calc(40px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -745,6 +748,16 @@ body {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+/* Divides the x01 stat tabs from the other-gamemode tabs (e.g. Around the Clock). */
+.tab-sep {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 1px;
+  height: 22px;
+  background: var(--muted);
+  opacity: 0.4;
+  margin: 0 4px;
 }
 
 /* ---- Rating badge (consistency) ---- */
