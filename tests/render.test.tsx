@@ -17,7 +17,7 @@ afterEach(async () => {
 describe('screens render without crashing', () => {
   it('Home shows the title and empty roster', async () => {
     render(<Home />);
-    expect(screen.getByText('🎯 Darts Tracker')).toBeTruthy();
+    expect(screen.getByText('🎯 DartTrak')).toBeTruthy();
     // Roster loads async from (fake) IndexedDB.
     expect(await screen.findByText('No players yet. Add one below.')).toBeTruthy();
   });

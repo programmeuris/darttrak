@@ -16,8 +16,8 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
         manifest: {
-          name: 'Darts Tracker',
-          short_name: 'Darts',
+          name: 'DartTrak',
+          short_name: 'DartTrak',
           description: 'Fully local, offline darts score tracker',
           theme_color: '#1a1a2e',
           background_color: '#1a1a2e',

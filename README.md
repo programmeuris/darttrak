@@ -1,4 +1,4 @@
-# 🎯 Darts Tracker
+# 🎯 DartTrak
 
 A fully local, offline-capable darts score tracking Progressive Web App (PWA).
 Built with **React**, **TypeScript**, and **Vite**. No backend, no accounts, no
