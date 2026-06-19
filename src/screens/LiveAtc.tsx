@@ -101,8 +101,11 @@ export function LiveAtc({ matchId }: { matchId: string }) {
   }
 
   async function confirmTurn() {
-    if (!match || currentDarts.length === 0) {
-      toast('Record at least one dart', 'error');
+    if (!match) return;
+    // A turn is three darts. The only exception is clearing the board early —
+    // then the win can be confirmed without filling the remaining slots.
+    if (!hasWon && currentDarts.length < 3) {
+      toast('Throw all 3 darts to finish the turn', 'error');
       return;
     }
     if (submitting.current) return; // guard against double-tap recording the turn twice
@@ -261,10 +264,10 @@ export function LiveAtc({ matchId }: { matchId: string }) {
         </button>
         <button
           className={`btn primary ${hasWon ? 'success' : ''}`}
-          disabled={currentDarts.length === 0}
+          disabled={!hasWon && currentDarts.length < 3}
           onClick={confirmTurn}
         >
-          {hasWon ? 'Confirm Win' : 'Confirm Turn'}
+          {hasWon ? 'Confirm Win' : `Confirm Turn (${currentDarts.length}/3)`}
         </button>
       </div>
 
