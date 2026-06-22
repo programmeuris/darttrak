@@ -85,9 +85,6 @@ export function Home() {
         <button className="btn primary big" onClick={() => navigate('/setup')}>
           🎯 New Match
         </button>
-        <button className="btn" onClick={() => navigate('/history')}>
-          History
-        </button>
       </div>
 
       <section className="card">
@@ -134,6 +131,10 @@ export function Home() {
           </button>
         </div>
       </section>
+
+      <button className="btn full" onClick={() => navigate('/history')}>
+        History
+      </button>
 
       <section className="card">
         <h2 className="card-title">Backup &amp; Restore</h2>
