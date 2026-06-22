@@ -176,15 +176,16 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
       <section className="card">
         <Grid
           cells={[
-            [String(o.matchesPlayed), 'Played'],
+            [String(o.competitivePlayed), `Played (${o.matchesPlayed} total)`],
             [String(o.matchesWon), 'Won'],
-            [`${o.winRate.toFixed(0)}%`, 'Win Rate'],
+            [o.competitivePlayed === 0 ? '—' : `${o.winRate.toFixed(0)}%`, 'Win Rate'],
             [o.overallAverage.toFixed(1), 'Overall Avg'],
             [o.bestMatchAverage.toFixed(1), 'Best Match Avg'],
             [String(o.total180s), '180s'],
             [o.bestCheckout > 0 ? String(o.bestCheckout) : '—', 'Best Checkout'],
           ]}
         />
+        <p className="muted">Win rate counts competitive games only (excludes solo practice).</p>
       </section>
       <ChartCard title="Average Per Match">
         <Line data={lineData} options={lineOpts} />
@@ -383,8 +384,8 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
           </h2>
           <Grid
             cells={[
-              [String(v.played), 'Played'],
-              [`${v.winRate.toFixed(0)}%`, 'Win Rate'],
+              [String(v.competitivePlayed), `Played (${v.played} total)`],
+              [v.competitivePlayed === 0 ? '—' : `${v.winRate.toFixed(0)}%`, 'Win Rate'],
               [`${v.hitRate.toFixed(0)}%`, 'Hit Rate'],
               [v.fewestToClear > 0 ? String(v.fewestToClear) : '—', 'Fewest Darts'],
               [v.avgDartsToClear > 0 ? v.avgDartsToClear.toFixed(0) : '—', 'Avg Darts'],

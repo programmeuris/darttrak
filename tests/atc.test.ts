@@ -162,6 +162,41 @@ describe('analytics by variant', () => {
     expect(dbl.won).toBe(0);
     expect(dbl.fewestToClear).toBe(0);
   });
+  it('counts solo games as played but not toward win rate', () => {
+    // A solo single-ring game: A is the only player and clears the board.
+    const solo = makeMatch({
+      id: 'solo-atc',
+      date: 4000,
+      gameType: 'AroundTheClock',
+      playerIds: [A],
+      winnerId: A,
+      atcRing: 'single',
+      legs: [clearLeg(A)],
+    });
+    const single = atcStatsByVariant([m1, solo], A).find((v) => v.ring === 'single')!;
+    expect(single.played).toBe(2); // m1 (competitive) + solo
+    expect(single.competitivePlayed).toBe(1); // m1 only
+    expect(single.won).toBe(1); // m1 win; the solo "win" is ignored
+    expect(single.winRate).toBe(100); // 1 of 1 competitive game
+  });
+
+  it('reports no win rate for a variant with only solo games', () => {
+    const solo = makeMatch({
+      id: 'solo-only',
+      date: 5000,
+      gameType: 'AroundTheClock',
+      playerIds: [A],
+      winnerId: A,
+      atcRing: 'triple',
+      legs: [clearLeg(A)],
+    });
+    const triple = atcStatsByVariant([solo], A).find((v) => v.ring === 'triple')!;
+    expect(triple.played).toBe(1);
+    expect(triple.competitivePlayed).toBe(0);
+    expect(triple.won).toBe(0);
+    expect(triple.winRate).toBe(0);
+  });
+
   it('returns per-match points sorted oldest first', () => {
     const points = atcPerMatch([m3, m1, m2], A);
     expect(points.map((p) => p.date)).toEqual([1000, 2000, 3000]);

@@ -50,6 +50,34 @@ describe('computePlayerOverview', () => {
   });
 });
 
+describe('solo games and win rate', () => {
+  // A solo practice game: A is the only participant, so A "wins" by default.
+  const solo: Match = makeMatch({
+    id: 'solo',
+    date: 4000,
+    gameType: '501',
+    playerIds: [A],
+    winnerId: A,
+    legs: [makeLeg('solo', [makeTurn(A, [S(20), S(20), S(20)], 441)], A)],
+  });
+
+  it('counts solo games as played but not toward win/loss', () => {
+    const o = computePlayerOverview([mA, mB, solo], A);
+    expect(o.matchesPlayed).toBe(3); // total includes the solo game
+    expect(o.competitivePlayed).toBe(2); // mA + mB
+    expect(o.matchesWon).toBe(1); // mA only — the solo "win" is ignored
+    expect(o.winRate).toBe(50); // 1 of 2 competitive games
+  });
+
+  it('reports no win rate when only solo games exist', () => {
+    const o = computePlayerOverview([solo], A);
+    expect(o.matchesPlayed).toBe(1);
+    expect(o.competitivePlayed).toBe(0);
+    expect(o.matchesWon).toBe(0);
+    expect(o.winRate).toBe(0); // the UI renders this as “—”
+  });
+});
+
 describe('averagePerMatch', () => {
   it('returns one point per match, oldest first', () => {
     const pts = averagePerMatch([mB, mA], A); // pass out of order
