@@ -174,6 +174,34 @@ describe('screens render without crashing', () => {
     });
   });
 
+  it('LiveAtc progressive requires a bull hit even after a treble', async () => {
+    const alice = await addPlayer('Alice');
+    // Alice has cleared 1–18 (progress 18); the next target is 19.
+    const cleared = Array.from({ length: 18 }, (_, i) => atcHitDart(i + 1));
+    const match = makeMatch({
+      id: 'm-prog',
+      gameType: 'AroundTheClock',
+      atcRing: 'progressive',
+      playerIds: [alice.id],
+      status: 'in_progress',
+      legs: [makeLeg('m-prog', [makeTurn(alice.id, cleared, 18)])],
+    });
+    await saveMatch(match);
+
+    render(<LiveAtc matchId="m-prog" />);
+    const treble = await screen.findByText('Treble +3');
+
+    // Treble 19 would overshoot the bull — capped, so it only reaches 20 and the
+    // board is not cleared yet.
+    fireEvent.click(treble);
+    expect(screen.queryByText(/clears the board/i)).toBeNull();
+    expect(screen.getByText('20/21')).toBeTruthy();
+
+    // The bull still has to be hit to finish.
+    fireEvent.click(screen.getByText('Hit +1'));
+    expect(screen.getByText(/clears the board/i)).toBeTruthy();
+  });
+
   it('Live shows a checkout suggestion when the player is on a finish', async () => {
     const bob = await addPlayer('Bob');
     // A prior turn leaves Bob on 40 → suggested finish is D20.

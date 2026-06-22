@@ -13,6 +13,7 @@ import {
   atcFewestDartsToComplete,
   atcStatsByVariant,
   atcPerMatch,
+  atcProgressiveSteps,
 } from '../src/atc';
 import {
   atcHitDart,
@@ -112,6 +113,20 @@ describe('progressive variant', () => {
   it('counts darts that hit, not steps', () => {
     expect(atcHits([progLeg], A)).toBe(3);
     expect(atcDartsThrown([progLeg], A)).toBe(3);
+  });
+
+  it('always requires the bull to finish (caps overshoot near the end)', () => {
+    // Mid-sequence the full multiplier applies.
+    expect(atcProgressiveSteps(5, 3)).toBe(3); // on 6, treble → +3
+    // Near the end a numbered hit can only reach the bull (progress 20), never 21.
+    expect(atcProgressiveSteps(18, 3)).toBe(2); // treble 19 → +2, lands on the bull
+    expect(atcProgressiveSteps(19, 3)).toBe(1); // treble 20 → +1
+    expect(atcProgressiveSteps(19, 2)).toBe(1); // double 20 → +1
+    // On the bull, the hit counts in full (single bull +1, double bull +2).
+    expect(atcProgressiveSteps(20, 1)).toBe(1);
+    expect(atcProgressiveSteps(20, 2)).toBe(2);
+    // A miss never advances.
+    expect(atcProgressiveSteps(18, 0)).toBe(0);
   });
 });
 

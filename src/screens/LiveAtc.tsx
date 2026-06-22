@@ -6,6 +6,7 @@ import {
   ATC_SEQUENCE,
   ATC_TARGET_COUNT,
   atcProgress,
+  atcProgressiveSteps,
   atcTargetLabel,
   atcRingLabel,
 } from '../atc';
@@ -97,7 +98,11 @@ export function LiveAtc({ matchId }: { matchId: string }) {
     const progressNow = Math.min(startProgress + hitsIn(currentDarts), ATC_TARGET_COUNT);
     if (progressNow >= ATC_TARGET_COUNT) return;
     const target = ATC_SEQUENCE[progressNow];
-    setCurrentDarts((d) => [...d, { score: steps, label: dartLabel(target, steps, ring), isDouble: false }]);
+    // Progressive: a numbered hit can't carry you past the bull — the label
+    // still shows the ring actually hit (e.g. "T19"), but progress is capped so
+    // the bull must be hit to finish.
+    const score = ring === 'progressive' ? atcProgressiveSteps(progressNow, steps) : steps;
+    setCurrentDarts((d) => [...d, { score, label: dartLabel(target, steps, ring), isDouble: false }]);
   }
 
   async function confirmTurn() {

@@ -65,6 +65,20 @@ export function atcTargetForProgress(progress: number): number | null {
   return ATC_SEQUENCE[progress];
 }
 
+/**
+ * Progressive mode always requires the bull to finish. A numbered-target hit
+ * may advance progress up to — but never past — the bull (the final target),
+ * so the overshoot from a double/treble near the end (e.g. a treble 19 or 20)
+ * is capped and the bull must still be hit deliberately. Returns the steps a
+ * dart actually contributes given the player's current progress.
+ */
+export function atcProgressiveSteps(progress: number, steps: number): number {
+  if (steps <= 0) return 0;
+  if (ATC_SEQUENCE[progress] === 25) return steps; // already aiming at the bull
+  const toBull = ATC_TARGET_COUNT - 1 - progress; // steps needed to reach the bull
+  return Math.min(steps, toBull);
+}
+
 // ---- Stats ----
 
 export function atcDartsThrown(legs: Leg[], playerId: string): number {
