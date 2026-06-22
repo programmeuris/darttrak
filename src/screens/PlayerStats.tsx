@@ -97,44 +97,52 @@ const TABS: { id: TabId; label: string; group: 'x01' | 'mode' }[] = [
   { id: 'atc', label: 'Around the Clock', group: 'mode' },
 ];
 
-export function PlayerStats() {
+// When `playerId` is passed (from a player profile) the screen locks to that
+// player and hides the picker; without it, it keeps the standalone dropdown.
+export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [playerId, setPlayerId] = useState('');
+  const [selectedId, setSelectedId] = useState('');
   const [tab, setTab] = useState<TabId>('overview');
 
   useEffect(() => {
     Promise.all([getPlayers(), getAllMatches()]).then(([ps, ms]) => {
       setPlayers(ps);
       setMatches(ms);
-      if (ps.length) setPlayerId(ps[0].id);
+      if (!lockedId && ps.length) setSelectedId(ps[0].id);
     });
-  }, []);
+  }, [lockedId]);
+
+  const playerId = lockedId ?? selectedId;
+  const names = new Map(players.map((p) => [p.id, p.name]));
+  const onBack = () => navigate(lockedId ? `/player/${lockedId}` : '/');
 
   if (players.length === 0) {
     return (
       <div className="screen">
-        <Header title="Player Stats" onBack={() => navigate('/')} />
+        <Header title="Player Stats" onBack={onBack} />
         <p className="muted center">Add players to see stats.</p>
       </div>
     );
   }
 
-  const names = new Map(players.map((p) => [p.id, p.name]));
+  const title = lockedId ? `${names.get(lockedId) ?? 'Player'} · Stats` : 'Player Stats';
 
   return (
     <div className="screen">
-      <Header title="Player Stats" onBack={() => navigate('/')} />
-      <section className="card">
-        <label className="field-label">Player</label>
-        <select className="select" value={playerId} onChange={(e) => setPlayerId(e.target.value)}>
-          {players.map((p) => (
-            <option value={p.id} key={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </section>
+      <Header title={title} onBack={onBack} />
+      {!lockedId && (
+        <section className="card">
+          <label className="field-label">Player</label>
+          <select className="select" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
+            {players.map((p) => (
+              <option value={p.id} key={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </section>
+      )}
 
       <div className="tab-bar">
         {TABS.map((t, i) => (

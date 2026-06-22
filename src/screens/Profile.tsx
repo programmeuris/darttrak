@@ -1,0 +1,61 @@
+import { useEffect, useState } from 'react';
+import { navigate } from '../router';
+import { toast } from '../toast';
+import { Header } from '../components/Header';
+import { getPlayer, getMatchesByPlayer } from '../db';
+import type { Player } from '../types';
+
+/**
+ * Per-player landing page. Analytics and history are reached from here so they
+ * stay bound to a single player; the disabled Settings entry marks where future
+ * per-player preferences (e.g. checkout tables) will live.
+ */
+export function Profile({ playerId }: { playerId: string }) {
+  const [player, setPlayer] = useState<Player | null>(null);
+  const [matchCount, setMatchCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const p = await getPlayer(playerId);
+      if (!active) return;
+      if (!p) {
+        toast('Player not found', 'error');
+        navigate('/');
+        return;
+      }
+      setPlayer(p);
+      const matches = await getMatchesByPlayer(playerId);
+      if (active) setMatchCount(matches.length);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [playerId]);
+
+  if (!player) return <div className="screen" />;
+
+  return (
+    <div className="screen">
+      <Header title={player.name} onBack={() => navigate('/')} />
+
+      <section className="card">
+        <p className="muted center">
+          {matchCount} {matchCount === 1 ? 'match' : 'matches'} played
+        </p>
+      </section>
+
+      <div className="home-actions">
+        <button className="btn primary big" onClick={() => navigate(`/player/${playerId}/stats`)}>
+          📊 Analytics
+        </button>
+        <button className="btn" onClick={() => navigate(`/player/${playerId}/history`)}>
+          History
+        </button>
+        <button className="btn" disabled title="Coming soon">
+          Settings · coming soon
+        </button>
+      </div>
+    </div>
+  );
+}

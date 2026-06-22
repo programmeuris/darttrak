@@ -244,7 +244,27 @@ body {
   padding: 8px 8px 8px 14px;
 }
 .roster-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text);
   font-weight: 500;
+  font-size: 1rem;
+  text-align: left;
+  padding: 8px 4px 8px 0;
+  min-height: 32px;
+  cursor: pointer;
+}
+.roster-name:active {
+  opacity: 0.7;
+}
+.roster-chevron {
+  color: var(--muted);
+  font-size: 1.2rem;
 }
 .empty {
   color: var(--muted);

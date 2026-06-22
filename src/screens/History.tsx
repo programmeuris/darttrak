@@ -7,15 +7,18 @@ import { startingScore } from '../scoring';
 import { ATC_TARGET_COUNT, atcRingLabel } from '../atc';
 import type { Match, Player, GameType } from '../types';
 
-export function History({ matchId }: { matchId?: string }) {
-  if (matchId) return <MatchDetail matchId={matchId} />;
-  return <MatchList />;
+// `playerId`, when set, scopes the screen to a single player's matches (reached
+// from that player's profile) and keeps navigation within the profile.
+export function History({ matchId, playerId }: { matchId?: string; playerId?: string }) {
+  const base = playerId ? `/player/${playerId}/history` : '/history';
+  if (matchId) return <MatchDetail matchId={matchId} backTo={base} />;
+  return <MatchList lockedPlayerId={playerId} base={base} />;
 }
 
-function MatchList() {
+function MatchList({ lockedPlayerId, base }: { lockedPlayerId?: string; base: string }) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [names, setNames] = useState<Map<string, string>>(new Map());
-  const [playerFilter, setPlayerFilter] = useState('');
+  const [playerFilter, setPlayerFilter] = useState(lockedPlayerId ?? '');
   const [gameFilter, setGameFilter] = useState<'' | GameType>('');
 
   useEffect(() => {
@@ -40,17 +43,22 @@ function MatchList() {
 
   return (
     <div className="screen">
-      <Header title="Match History" onBack={() => navigate('/')} />
+      <Header
+        title={lockedPlayerId ? `${names.get(lockedPlayerId) ?? 'Player'} · History` : 'Match History'}
+        onBack={() => navigate(lockedPlayerId ? `/player/${lockedPlayerId}` : '/')}
+      />
       <section className="card">
         <div className="filter-row">
-          <select className="select" value={playerFilter} onChange={(e) => setPlayerFilter(e.target.value)}>
-            <option value="">All players</option>
-            {players.map(([id, name]) => (
-              <option value={id} key={id}>
-                {name}
-              </option>
-            ))}
-          </select>
+          {!lockedPlayerId && (
+            <select className="select" value={playerFilter} onChange={(e) => setPlayerFilter(e.target.value)}>
+              <option value="">All players</option>
+              {players.map(([id, name]) => (
+                <option value={id} key={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          )}
           <select className="select" value={gameFilter} onChange={(e) => setGameFilter(e.target.value as '' | GameType)}>
             <option value="">All games</option>
             <option value="501">501</option>
@@ -68,7 +76,7 @@ function MatchList() {
             <div className="match-row" key={m.id}>
               <button
                 className="match-main"
-                onClick={() => navigate(m.status === 'in_progress' ? `/live/${m.id}` : `/history/${m.id}`)}
+                onClick={() => navigate(m.status === 'in_progress' ? `/live/${m.id}` : `${base}/${m.id}`)}
               >
                 <div className="match-line1">
                   <span className="match-game">{m.gameType}</span>
@@ -92,7 +100,7 @@ function MatchList() {
   );
 }
 
-function MatchDetail({ matchId }: { matchId: string }) {
+function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
   const [match, setMatch] = useState<Match | null>(null);
   const [names, setNames] = useState<Map<string, string>>(new Map());
 
@@ -103,7 +111,7 @@ function MatchDetail({ matchId }: { matchId: string }) {
       if (!active) return;
       if (!m) {
         toast('Match not found', 'error');
-        navigate('/history');
+        navigate(backTo);
         return;
       }
       const players = await getPlayers();
@@ -113,7 +121,7 @@ function MatchDetail({ matchId }: { matchId: string }) {
     return () => {
       active = false;
     };
-  }, [matchId]);
+  }, [matchId, backTo]);
 
   if (!match) return <div className="screen" />;
 
@@ -124,7 +132,7 @@ function MatchDetail({ matchId }: { matchId: string }) {
 
   return (
     <div className="screen">
-      <Header title="Match Detail" onBack={() => navigate('/history')} />
+      <Header title="Match Detail" onBack={() => navigate(backTo)} />
 
       <section className="card">
         <div className="match-line1">

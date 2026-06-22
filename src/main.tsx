@@ -12,6 +12,7 @@ import { LiveAtc } from './screens/LiveAtc';
 import { Summary } from './screens/Summary';
 import { History } from './screens/History';
 import { PlayerStats } from './screens/PlayerStats';
+import { Profile } from './screens/Profile';
 
 /**
  * Catches render-time errors so a single bad screen can't blank the whole app
@@ -97,6 +98,21 @@ function Screen({ name, params }: { name: string; params: string[] }) {
       return <History matchId={params[0]} />;
     case 'stats':
       return <PlayerStats />;
+    case 'player': {
+      // /player/:id, /player/:id/stats, /player/:id/history[/:matchId]
+      const id = params[0];
+      if (!id) return <Redirect to="/" />;
+      switch (params[1]) {
+        case undefined:
+          return <Profile playerId={id} />;
+        case 'stats':
+          return <PlayerStats playerId={id} />;
+        case 'history':
+          return <History playerId={id} matchId={params[2]} />;
+        default:
+          return <Redirect to={`/player/${id}`} />;
+      }
+    }
     default:
       return <Redirect to="/" />;
   }

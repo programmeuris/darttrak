@@ -88,9 +88,6 @@ export function Home() {
         <button className="btn" onClick={() => navigate('/history')}>
           History
         </button>
-        <button className="btn" onClick={() => navigate('/stats')}>
-          Stats
-        </button>
       </div>
 
       <section className="card">
@@ -101,7 +98,16 @@ export function Home() {
           ) : (
             players.map((p) => (
               <li className="roster-item" key={p.id}>
-                <span className="roster-name">{p.name}</span>
+                <button
+                  className="roster-name"
+                  aria-label={`Open ${p.name}'s profile`}
+                  onClick={() => navigate(`/player/${p.id}`)}
+                >
+                  {p.name}
+                  <span className="roster-chevron" aria-hidden="true">
+                    ›
+                  </span>
+                </button>
                 <button
                   className="icon-btn danger"
                   aria-label={`Delete ${p.name}`}
