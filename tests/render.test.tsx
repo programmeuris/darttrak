@@ -7,11 +7,14 @@ import { Setup } from '../src/screens/Setup';
 import { PlayerStats } from '../src/screens/PlayerStats';
 import { Live } from '../src/screens/Live';
 import { LiveAtc } from '../src/screens/LiveAtc';
+import { Profile } from '../src/screens/Profile';
+import { History } from '../src/screens/History';
 import { addPlayer, saveMatch, getMatch, importAllData } from '../src/db';
 import { makeMatch, makeLeg, makeTurn, S, atcHitDart } from './helpers';
 
 afterEach(async () => {
   cleanup();
+  location.hash = '';
   await importAllData({ players: [], matches: [] }); // reset the shared fake DB
 });
 
@@ -186,5 +189,81 @@ describe('screens render without crashing', () => {
 
     render(<Live matchId="m-co" />);
     expect(await screen.findByText('D20')).toBeTruthy();
+  });
+});
+
+describe('player profiles', () => {
+  it('Home links each player to their profile', async () => {
+    const alice = await addPlayer('Alice');
+    render(<Home />);
+    const link = await screen.findByRole('button', { name: /Open Alice's profile/i });
+    fireEvent.click(link);
+    expect(location.hash).toBe(`#/player/${alice.id}`);
+  });
+
+  it('Home no longer shows a global Stats button', async () => {
+    render(<Home />);
+    await screen.findByText('History'); // wait for the screen
+    expect(screen.queryByText('Stats')).toBeNull();
+  });
+
+  it('Profile shows the name, match count, and analytics entry', async () => {
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: 'pf1',
+        gameType: '501',
+        playerIds: [alice.id],
+        status: 'completed',
+        winnerId: alice.id,
+        legs: [makeLeg('pf1', [makeTurn(alice.id, [S(20)], 481)], alice.id)],
+      }),
+    );
+    render(<Profile playerId={alice.id} />);
+    expect(await screen.findByText('Alice')).toBeTruthy();
+    expect(screen.getByText('1 match played')).toBeTruthy();
+    fireEvent.click(screen.getByText('📊 Analytics'));
+    expect(location.hash).toBe(`#/player/${alice.id}/stats`);
+  });
+
+  it('PlayerStats locks to a player and hides the picker', async () => {
+    const alice = await addPlayer('Alice');
+    render(<PlayerStats playerId={alice.id} />);
+    expect(await screen.findByText('Alice · Stats')).toBeTruthy();
+    expect(screen.queryByText('All players')).toBeNull();
+    // The standalone picker label is not rendered in locked mode.
+    expect(screen.queryByText('Player')).toBeNull();
+  });
+
+  it('History scopes to one player and hides the player filter', async () => {
+    const alice = await addPlayer('Alice');
+    const bob = await addPlayer('Bob');
+    await saveMatch(
+      makeMatch({
+        id: 'ah1',
+        gameType: '501',
+        playerIds: [alice.id, bob.id],
+        status: 'completed',
+        winnerId: alice.id,
+        legs: [makeLeg('ah1', [], alice.id)],
+      }),
+    );
+    await saveMatch(
+      makeMatch({
+        id: 'bh1',
+        gameType: '501',
+        playerIds: [bob.id],
+        status: 'completed',
+        winnerId: bob.id,
+        legs: [makeLeg('bh1', [], bob.id)],
+      }),
+    );
+    render(<History playerId={alice.id} />);
+    expect(await screen.findByText('Alice · History')).toBeTruthy();
+    // Player filter dropdown is hidden; the game filter stays.
+    expect(screen.queryByText('All players')).toBeNull();
+    expect(screen.getByText('All games')).toBeTruthy();
+    // Only Alice's match is listed (Bob's solo game is excluded).
+    expect(screen.getByText('Alice vs Bob')).toBeTruthy();
   });
 });

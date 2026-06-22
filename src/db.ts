@@ -53,6 +53,11 @@ export async function getPlayers(): Promise<Player[]> {
   return players.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export async function getPlayer(id: string): Promise<Player | undefined> {
+  const db = await getDB();
+  return db.get('players', id);
+}
+
 export async function addPlayer(name: string): Promise<Player> {
   const db = await getDB();
   const player: Player = {
