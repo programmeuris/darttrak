@@ -44,6 +44,32 @@ describe('screens render without crashing', () => {
     expect(screen.getByText('Progressive')).toBeTruthy();
   });
 
+  it('Setup shows live throw-order badges on selected players', async () => {
+    await addPlayer('Alice');
+    await addPlayer('Bob');
+    render(<Setup />);
+
+    const aliceLabel = (await screen.findByText('Alice')).closest('label')!;
+    const bobLabel = screen.getByText('Bob').closest('label')!;
+    const aliceBox = aliceLabel.querySelector('input')!;
+    const bobBox = bobLabel.querySelector('input')!;
+    const badge = (label: HTMLElement) => label.querySelector('.order-badge');
+
+    // Unselected players carry no badge.
+    expect(badge(aliceLabel)).toBeNull();
+
+    // Select Bob first, then Alice → Bob throws 1st, Alice 2nd.
+    fireEvent.click(bobBox);
+    fireEvent.click(aliceBox);
+    expect(badge(bobLabel)!.textContent).toBe('1');
+    expect(badge(aliceLabel)!.textContent).toBe('2');
+
+    // Deselecting the first re-numbers the rest live.
+    fireEvent.click(bobBox);
+    expect(badge(bobLabel)).toBeNull();
+    expect(badge(aliceLabel)!.textContent).toBe('1');
+  });
+
   it('PlayerStats prompts to add players when none exist', async () => {
     render(<PlayerStats />);
     expect(await screen.findByText('Add players to see stats.')).toBeTruthy();
