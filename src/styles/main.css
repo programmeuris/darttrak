@@ -319,6 +319,27 @@ body {
   height: 22px;
   accent-color: var(--accent);
 }
+.check-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Throw-order badge after a selected player's name (1 = throws first). */
+.order-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
 .toggle-row {
   display: flex;
   align-items: center;

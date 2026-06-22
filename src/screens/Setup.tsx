@@ -107,7 +107,15 @@ export function Setup() {
                   checked={selected.includes(p.id)}
                   onChange={(e) => togglePlayer(p.id, e.target.checked)}
                 />
-                <span>{p.name}</span>
+                <span className="check-name">{p.name}</span>
+                {selected.includes(p.id) && (
+                  <span
+                    className="order-badge"
+                    aria-label={`Throws ${selected.indexOf(p.id) + 1}`}
+                  >
+                    {selected.indexOf(p.id) + 1}
+                  </span>
+                )}
               </label>
             ))}
           </div>
