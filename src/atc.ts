@@ -131,9 +131,10 @@ export function atcMatchesFor(matches: Match[], playerId: string): Match[] {
 
 export interface AtcVariantStats {
   ring: AtcRing;
-  played: number;
-  won: number;
-  winRate: number;
+  played: number; // all completed games of this variant (solo included)
+  competitivePlayed: number; // games of this variant with 2+ participants
+  won: number; // wins among competitive games
+  winRate: number; // over competitive games (0 when none)
   hitRate: number;
   fewestToClear: number; // fewest darts to clear a leg
   avgDartsToClear: number; // mean darts per leg the player won
@@ -147,7 +148,9 @@ export function atcStatsByVariant(matches: Match[], playerId: string): AtcVarian
     const group = all.filter((m) => ringOf(m) === ring);
     if (group.length === 0) continue;
     const legs = group.flatMap((m) => m.legs);
-    const won = group.filter((m) => m.winnerId === playerId).length;
+    // Solo games are automatic wins, so win/loss only counts competitive games.
+    const competitive = group.filter((m) => m.playerIds.length >= 2);
+    const won = competitive.filter((m) => m.winnerId === playerId).length;
     const wonLegDarts = legs
       .filter((l) => l.winnerId === playerId)
       .map((l) => playerDartsInLeg(l, playerId))
@@ -155,8 +158,9 @@ export function atcStatsByVariant(matches: Match[], playerId: string): AtcVarian
     out.push({
       ring,
       played: group.length,
+      competitivePlayed: competitive.length,
       won,
-      winRate: (won / group.length) * 100,
+      winRate: competitive.length === 0 ? 0 : (won / competitive.length) * 100,
       hitRate: atcHitRate(legs, playerId),
       fewestToClear: wonLegDarts.length ? Math.min(...wonLegDarts) : 0,
       avgDartsToClear: wonLegDarts.length

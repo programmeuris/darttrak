@@ -7,9 +7,10 @@ import {
 } from './scoring';
 
 export interface PlayerOverview {
-  matchesPlayed: number;
-  matchesWon: number;
-  winRate: number; // 0-100
+  matchesPlayed: number; // all completed x01 games (solo practice included)
+  competitivePlayed: number; // games with 2+ participants
+  matchesWon: number; // wins among competitive games
+  winRate: number; // 0-100, over competitive games (0 when none)
   overallAverage: number; // 3-dart average across all matches
   bestMatchAverage: number;
   total180s: number;
@@ -33,7 +34,11 @@ export function computePlayerOverview(
   playerId: string,
 ): PlayerOverview {
   const played = completedMatchesFor(matches, playerId);
-  const matchesWon = played.filter((m) => m.winnerId === playerId).length;
+  // A solo practice game is an automatic "win" (no opponent), so win/loss is
+  // only meaningful over competitive games. Scoring stats below still use every
+  // game — they measure skill, not results.
+  const competitive = played.filter((m) => m.playerIds.length >= 2);
+  const matchesWon = competitive.filter((m) => m.winnerId === playerId).length;
 
   // Overall average: weight by darts thrown across every leg of every match.
   const allLegs: Leg[] = [];
@@ -51,8 +56,9 @@ export function computePlayerOverview(
 
   return {
     matchesPlayed: played.length,
+    competitivePlayed: competitive.length,
     matchesWon,
-    winRate: played.length === 0 ? 0 : (matchesWon / played.length) * 100,
+    winRate: competitive.length === 0 ? 0 : (matchesWon / competitive.length) * 100,
     overallAverage,
     bestMatchAverage,
     total180s,
