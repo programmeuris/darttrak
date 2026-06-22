@@ -15,7 +15,7 @@ export function atcRingLabel(ring: AtcRing): string {
     case 'progressive':
       return 'Progressive';
     default:
-      return 'Singles';
+      return 'Any'; // the 'single' ring counts a hit anywhere on the number
   }
 }
 

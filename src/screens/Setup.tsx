@@ -19,7 +19,7 @@ const FORMATS = [
 ];
 
 const RINGS: { ring: AtcRing; label: string }[] = [
-  { ring: 'single', label: 'Singles' },
+  { ring: 'single', label: 'Any' },
   { ring: 'double', label: 'Doubles' },
   { ring: 'triple', label: 'Trebles' },
   { ring: 'progressive', label: 'Progressive' },
@@ -146,8 +146,8 @@ export function Setup() {
         <section className="card">
           <h2 className="card-title">Ring</h2>
           <p className="muted">
-            Which ring counts as a hit. Progressive lets any ring hit, but doubles advance +2 and
-            trebles +3. Tracked separately in your stats.
+            Which ring must be hit. “Any” counts a hit anywhere on the number; Progressive also
+            allows any ring but doubles advance +2 and trebles +3. Tracked separately in your stats.
           </p>
           <div className="chip-row">
             {RINGS.map((r) => (

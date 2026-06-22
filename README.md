@@ -8,7 +8,7 @@ external connections — all data is stored in your browser via **IndexedDB**.
 
 - **501 / 301** scoring with configurable **Double Out** and best-of-1/3/5 leg formats
 - **Around the Clock** mode — race 1 → 20 → bull with a hit/miss tap input and a
-  Singles / Doubles / Trebles ring setting, plus a **Progressive** variant where
+  Any / Doubles / Trebles ring setting, plus a **Progressive** variant where
   doubles advance +2 and trebles +3 (each tracked separately in stats)
 - **1–4 players** per match, drawn from a saved roster
 - **Live scoring** screen optimised for mobile: large tap targets, segmented

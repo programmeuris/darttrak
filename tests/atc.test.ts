@@ -44,7 +44,7 @@ describe('sequence and labels', () => {
     expect(atcTargetLabel(25, 'triple')).toBe('Bull');
   });
   it('names variants', () => {
-    expect(atcRingLabel('single')).toBe('Singles');
+    expect(atcRingLabel('single')).toBe('Any');
     expect(atcRingLabel('progressive')).toBe('Progressive');
   });
 });
