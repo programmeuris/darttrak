@@ -1,13 +1,13 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import 'chart.js/auto';
 import { Line, Bar } from 'react-chartjs-2';
-import type { ChartData, ChartDataset, ChartOptions } from 'chart.js';
+import type { ChartData, ChartDataset, ChartOptions, TooltipItem } from 'chart.js';
 import { navigate } from '../router';
 import { Header, StatCell } from '../components/Header';
 import { getPlayers, getAllMatches } from '../db';
 import { computePlayerOverview, averagePerMatch, scoreDistribution } from '../stats';
 import { consistencyStats, finishingStats, scoringStats, headToHead } from '../analysis';
-import { atcStatsByVariant, atcPerMatch, atcRingLabel } from '../atc';
+import { atcStatsByVariant, atcHitRateSeriesByVariant, atcRingLabel } from '../atc';
 import type { Player, Match, AtcRing } from '../types';
 
 const TEXT = '#eaeaea';
@@ -171,9 +171,20 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
   const o = computePlayerOverview(matches, playerId);
   const avg = averagePerMatch(matches, playerId);
   const dist = scoreDistribution(matches, playerId);
+  // X-axis is the match number (1, 2, …); the date moves into the tooltip so
+  // same-day games don't collapse onto a repeated label.
   const lineData: ChartData<'line'> = {
-    labels: avg.map((p) => p.label),
+    labels: avg.map((_, i) => `Match ${i + 1}`),
     datasets: [line('3-Dart Avg', avg.map((p) => round(p.average)), ACCENT, true)],
+  };
+  const avgOpts: ChartOptions<'line'> = {
+    ...lineOpts,
+    plugins: {
+      ...lineOpts.plugins,
+      tooltip: {
+        callbacks: { title: (items: TooltipItem<'line'>[]) => avg[items[0]?.dataIndex ?? 0]?.label ?? '' },
+      },
+    },
   };
   const barData: ChartData<'bar'> = {
     labels: dist.labels,
@@ -196,7 +207,7 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
         <p className="muted">Win rate counts competitive games only (excludes solo practice).</p>
       </section>
       <ChartCard title="Average Per Match">
-        <Line data={lineData} options={lineOpts} />
+        <Line data={lineData} options={avgOpts} />
       </ChartCard>
       <ChartCard title="Score Distribution">
         <Bar data={barData} options={barOpts} />
@@ -360,18 +371,34 @@ function HeadToHead({ matches, playerId, names }: { matches: Match[]; playerId: 
 function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
   const variants = atcStatsByVariant(matches, playerId);
   if (variants.length === 0) return <Empty text="No completed Around the Clock matches yet." />;
-  const points = atcPerMatch(matches, playerId);
+  // Each variant is indexed by its own game count so they align at game 1,
+  // rather than sharing a date axis where same-day / cross-variant games collide.
+  const series = atcHitRateSeriesByVariant(matches, playerId);
+  const maxGames = Math.max(0, ...series.map((s) => s.points.length));
   const hitData: ChartData<'line'> = {
-    labels: points.map((p) => p.label),
-    datasets: variants.map((v) => ({
-      label: atcRingLabel(v.ring),
-      data: points.map((p) => (p.ring === v.ring ? round(p.hitRate) : null)),
-      borderColor: RING_COLORS[v.ring],
-      backgroundColor: RING_COLORS[v.ring],
-      spanGaps: true,
+    labels: Array.from({ length: maxGames }, (_, i) => `Game ${i + 1}`),
+    datasets: series.map((s) => ({
+      label: atcRingLabel(s.ring),
+      data: s.points.map((p) => round(p.hitRate)),
+      borderColor: RING_COLORS[s.ring],
+      backgroundColor: RING_COLORS[s.ring],
       tension: 0.25,
       pointRadius: 3,
     })),
+  };
+  const hitOpts: ChartOptions<'line'> = {
+    ...lineOpts,
+    plugins: {
+      ...lineOpts.plugins,
+      tooltip: {
+        callbacks: {
+          label: (ctx: TooltipItem<'line'>) => {
+            const pt = series[ctx.datasetIndex]?.points[ctx.dataIndex];
+            return `${ctx.dataset.label}: ${ctx.parsed.y}%${pt ? ` · ${pt.label}` : ''}`;
+          },
+        },
+      },
+    },
   };
   const dartsData: ChartData<'bar'> = {
     labels: variants.map((v) => atcRingLabel(v.ring)),
@@ -401,8 +428,8 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
           />
         </section>
       ))}
-      <ChartCard title="Hit % Over Time" subtitle="One line per variant — gaps where that variant wasn’t played.">
-        <Line data={hitData} options={lineOpts} />
+      <ChartCard title="Hit % by Game" subtitle="One line per variant, each indexed by its own game count.">
+        <Line data={hitData} options={hitOpts} />
       </ChartCard>
       <ChartCard title="Avg Darts to Clear" subtitle="Average darts to clear a leg, by variant (lower is better).">
         <Bar data={dartsData} options={barOpts} />
