@@ -811,15 +811,14 @@ body {
   border-color: var(--accent);
   color: #fff;
 }
-/* Divides the x01 stat tabs from the other-gamemode tabs (e.g. Around the Clock). */
-.tab-sep {
-  flex: 0 0 auto;
-  align-self: center;
-  width: 1px;
-  height: 22px;
-  background: var(--muted);
-  opacity: 0.4;
-  margin: 0 4px;
+/* Secondary row of x01 lenses nested under the x01 mode (smaller, less prominent). */
+.tab-bar-sub {
+  margin-top: 8px;
+}
+.tab-bar-sub .tab {
+  min-height: 38px;
+  font-size: 0.86rem;
+  padding: 0 13px;
 }
 
 /* ---- Rating badge (consistency) ---- */

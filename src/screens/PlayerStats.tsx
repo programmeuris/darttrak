@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import 'chart.js/auto';
 import { Line, Bar } from 'react-chartjs-2';
 import type { ChartData, ChartDataset, ChartOptions, TooltipItem } from 'chart.js';
@@ -85,21 +85,27 @@ function Empty({ text }: { text: string }) {
   );
 }
 
-type TabId = 'overview' | 'consistency' | 'finishing' | 'scoring' | 'h2h' | 'atc';
-// `group` splits the x01 categories from the other-gamemode categories so the
-// tab bar can show a separator at the boundary (the ATC tab is x01-irrelevant).
-const TABS: { id: TabId; label: string; group: 'x01' | 'mode' }[] = [
-  { id: 'overview', label: 'Overview', group: 'x01' },
-  { id: 'consistency', label: 'Consistency', group: 'x01' },
-  { id: 'finishing', label: 'Finishing', group: 'x01' },
-  { id: 'scoring', label: 'Scoring', group: 'x01' },
-  { id: 'h2h', label: 'Head-to-Head', group: 'x01' },
-  { id: 'atc', label: 'Around the Clock', group: 'mode' },
+// The nav has two levels: a top row of game modes, and — under the x01 mode — a
+// sub-row of analytical lenses. ATC is its own mode with its own internal views.
+type X01Lens = 'overview' | 'consistency' | 'finishing' | 'scoring' | 'h2h';
+type StatsMode = 'x01' | 'atc';
+type TabId = X01Lens | 'atc'; // the active leaf view (an x01 lens, or atc)
+
+const MODES: { id: StatsMode; label: string }[] = [
+  { id: 'x01', label: 'x01' },
+  { id: 'atc', label: 'Around the Clock' },
+];
+const X01_TABS: { id: X01Lens; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'consistency', label: 'Consistency' },
+  { id: 'finishing', label: 'Finishing' },
+  { id: 'scoring', label: 'Scoring' },
+  { id: 'h2h', label: 'Head-to-Head' },
 ];
 
 // Remember the last-open tab per player (a per-device UI preference, so it lives
 // in localStorage rather than the player/data model). Falls back to overview.
-const TAB_IDS = new Set<string>(TABS.map((t) => t.id));
+const TAB_IDS = new Set<string>([...X01_TABS.map((t) => t.id), 'atc']);
 const tabStorageKey = (playerId: string) => `darttrak:statsTab:${playerId}`;
 
 function readStoredTab(playerId: string): TabId {
@@ -150,6 +156,15 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
     setTab(t);
     if (playerId) writeStoredTab(playerId, t);
   }
+
+  // Active top-level mode, plus the last x01 lens so switching x01 ← ATC returns
+  // to the lens you were on rather than always resetting to Overview.
+  const mode: StatsMode = tab === 'atc' ? 'atc' : 'x01';
+  const lastX01Lens = useRef<X01Lens>('overview');
+  useEffect(() => {
+    if (tab !== 'atc') lastX01Lens.current = tab;
+  }, [tab]);
+  const selectMode = (m: StatsMode) => selectTab(m === 'atc' ? 'atc' : lastX01Lens.current);
   const names = new Map(players.map((p) => [p.id, p.name]));
   const onBack = () => navigate(lockedId ? `/player/${lockedId}` : '/');
 
@@ -181,15 +196,29 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
       )}
 
       <div className="tab-bar">
-        {TABS.map((t, i) => (
-          <Fragment key={t.id}>
-            {i > 0 && TABS[i - 1].group !== t.group && <span className="tab-sep" aria-hidden="true" />}
-            <button className={`tab ${t.id === tab ? 'active' : ''}`} onClick={() => selectTab(t.id)}>
-              {t.label}
-            </button>
-          </Fragment>
+        {MODES.map((m) => (
+          <button
+            key={m.id}
+            className={`tab ${mode === m.id ? 'active' : ''}`}
+            onClick={() => selectMode(m.id)}
+          >
+            {m.label}
+          </button>
         ))}
       </div>
+      {mode === 'x01' && (
+        <div className="tab-bar tab-bar-sub">
+          {X01_TABS.map((t) => (
+            <button
+              key={t.id}
+              className={`tab ${t.id === tab ? 'active' : ''}`}
+              onClick={() => selectTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="stats-panel">
         {tab === 'overview' && <Overview matches={matches} playerId={playerId} />}

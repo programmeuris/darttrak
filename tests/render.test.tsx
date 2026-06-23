@@ -318,6 +318,21 @@ describe('player profiles', () => {
     expect(screen.getByText('Overview').className).toContain('active');
   });
 
+  it('PlayerStats nests x01 lenses under a top-level mode and remembers the lens', async () => {
+    const alice = await addPlayer('Alice');
+    render(<PlayerStats playerId={alice.id} />);
+    await screen.findByText('Alice · Stats');
+
+    // x01 mode shows the lens sub-tabs; pick one.
+    fireEvent.click(screen.getByText('Consistency'));
+    // Switching to the ATC mode hides the x01 lenses.
+    fireEvent.click(screen.getByText('Around the Clock'));
+    expect(screen.queryByText('Consistency')).toBeNull();
+    // Back to x01 returns to the lens we were on, not Overview.
+    fireEvent.click(screen.getByText('x01'));
+    expect(screen.getByText('Consistency').className).toContain('active');
+  });
+
   it('PlayerStats ATC chart toggles between Hit % and Darts/game', async () => {
     const alice = await addPlayer('Alice');
     await saveMatch(
