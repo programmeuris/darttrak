@@ -15,6 +15,7 @@ import { Profile } from '../src/screens/Profile';
 import { History } from '../src/screens/History';
 import { addPlayer, saveMatch, getMatch, importAllData } from '../src/db';
 import { makeMatch, makeLeg, makeTurn, S, atcHitDart } from './helpers';
+import type { AtcRing } from '../src/types';
 
 afterEach(async () => {
   cleanup();
@@ -387,5 +388,44 @@ describe('player profiles', () => {
     expect(screen.getByText('All games')).toBeTruthy();
     // Only Alice's match is listed (Bob's solo game is excluded).
     expect(screen.getByText('Alice vs Bob')).toBeTruthy();
+  });
+});
+
+describe('LiveAtc action layout', () => {
+  async function renderLiveAtc(ring: AtcRing, findLabel: string) {
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: `atc-${ring}`,
+        gameType: 'AroundTheClock',
+        atcRing: ring,
+        playerIds: [alice.id],
+        status: 'in_progress',
+        legs: [makeLeg(`atc-${ring}`, [])],
+      }),
+    );
+    render(<LiveAtc matchId={`atc-${ring}`} />);
+    await screen.findByText(findLabel);
+  }
+
+  const buttonLabels = (selector: string) =>
+    Array.from(document.querySelector(selector)!.querySelectorAll('button')).map((b) =>
+      b.textContent?.trim(),
+    );
+
+  it('Progressive groups the scoring buttons and puts Miss last (bottom-right)', async () => {
+    await renderLiveAtc('progressive', 'Hit +1');
+    expect(buttonLabels('.atc-prog-actions')).toEqual([
+      'Hit +1',
+      'Double +2',
+      'Treble +3',
+      'Miss ✗',
+    ]);
+  });
+
+  it('Single ring keeps Hit then Miss (Miss on the right) — same side as Progressive', async () => {
+    await renderLiveAtc('single', 'HIT ✓');
+    // The first .live-actions row is the hit/miss pair (the undo/confirm row follows).
+    expect(buttonLabels('.live-actions')).toEqual(['HIT ✓', 'MISS ✗']);
   });
 });
