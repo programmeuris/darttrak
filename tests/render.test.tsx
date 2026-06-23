@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto';
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+
+// Chart.js needs a real canvas, which jsdom lacks; stub the chart components so
+// chart-bearing screens render (and re-render on toggle) without a canvas.
+vi.mock('react-chartjs-2', () => ({ Line: () => null, Bar: () => null }));
 import { Home } from '../src/screens/Home';
 import { Setup } from '../src/screens/Setup';
 import { PlayerStats } from '../src/screens/PlayerStats';
@@ -287,6 +291,30 @@ describe('player profiles', () => {
     expect(screen.queryByText('All players')).toBeNull();
     // The standalone picker label is not rendered in locked mode.
     expect(screen.queryByText('Player')).toBeNull();
+  });
+
+  it('PlayerStats ATC chart toggles between Hit % and Darts/game', async () => {
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: 'atc-toggle',
+        gameType: 'AroundTheClock',
+        atcRing: 'single',
+        playerIds: [alice.id],
+        status: 'completed',
+        winnerId: alice.id,
+        legs: [makeLeg('atc-toggle', [makeTurn(alice.id, [atcHitDart(1)], 1)], alice.id)],
+      }),
+    );
+    render(<PlayerStats playerId={alice.id} />);
+    fireEvent.click(await screen.findByText('Around the Clock'));
+
+    // Default metric is Hit %; toggling switches the chart's metric/title.
+    expect(await screen.findByText('Hit % by Game')).toBeTruthy();
+    fireEvent.click(screen.getByText('Darts / game'));
+    expect(screen.getByText('Darts by Game')).toBeTruthy();
+    fireEvent.click(screen.getByText('Hit %'));
+    expect(screen.getByText('Hit % by Game')).toBeTruthy();
   });
 
   it('History scopes to one player and hides the player filter', async () => {

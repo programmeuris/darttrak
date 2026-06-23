@@ -7,7 +7,7 @@ import { Header, StatCell } from '../components/Header';
 import { getPlayers, getAllMatches } from '../db';
 import { computePlayerOverview, averagePerMatch, scoreDistribution } from '../stats';
 import { consistencyStats, finishingStats, scoringStats, headToHead } from '../analysis';
-import { atcStatsByVariant, atcHitRateSeriesByVariant, atcRingLabel } from '../atc';
+import { atcStatsByVariant, atcSeriesByVariant, atcRingLabel } from '../atc';
 import type { Player, Match, AtcRing } from '../types';
 
 const TEXT = '#eaeaea';
@@ -369,24 +369,26 @@ function HeadToHead({ matches, playerId, names }: { matches: Match[]; playerId: 
 }
 
 function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
+  const [metric, setMetric] = useState<'hit' | 'darts'>('hit');
   const variants = atcStatsByVariant(matches, playerId);
   if (variants.length === 0) return <Empty text="No completed Around the Clock matches yet." />;
+  const isHit = metric === 'hit';
   // Each variant is indexed by its own game count so they align at game 1,
   // rather than sharing a date axis where same-day / cross-variant games collide.
-  const series = atcHitRateSeriesByVariant(matches, playerId);
+  const series = atcSeriesByVariant(matches, playerId);
   const maxGames = Math.max(0, ...series.map((s) => s.points.length));
-  const hitData: ChartData<'line'> = {
+  const lineData: ChartData<'line'> = {
     labels: Array.from({ length: maxGames }, (_, i) => `Game ${i + 1}`),
     datasets: series.map((s) => ({
       label: atcRingLabel(s.ring),
-      data: s.points.map((p) => round(p.hitRate)),
+      data: s.points.map((p) => (isHit ? round(p.hitRate) : p.darts)),
       borderColor: RING_COLORS[s.ring],
       backgroundColor: RING_COLORS[s.ring],
       tension: 0.25,
       pointRadius: 3,
     })),
   };
-  const hitOpts: ChartOptions<'line'> = {
+  const lineOptsMetric: ChartOptions<'line'> = {
     ...lineOpts,
     plugins: {
       ...lineOpts.plugins,
@@ -394,7 +396,8 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         callbacks: {
           label: (ctx: TooltipItem<'line'>) => {
             const pt = series[ctx.datasetIndex]?.points[ctx.dataIndex];
-            return `${ctx.dataset.label}: ${ctx.parsed.y}%${pt ? ` · ${pt.label}` : ''}`;
+            const value = isHit ? `${ctx.parsed.y}%` : `${ctx.parsed.y} darts`;
+            return `${ctx.dataset.label}: ${value}${pt ? ` · ${pt.label}` : ''}`;
           },
         },
       },
@@ -428,9 +431,21 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
           />
         </section>
       ))}
-      <ChartCard title="Hit % by Game" subtitle="One line per variant, each indexed by its own game count.">
-        <Line data={hitData} options={hitOpts} />
-      </ChartCard>
+      <section className="card">
+        <h2 className="card-title">{isHit ? 'Hit % by Game' : 'Darts by Game'}</h2>
+        <p className="muted">One line per variant, each indexed by its own game count.</p>
+        <div className="chip-row">
+          <button className={`chip ${isHit ? 'active' : ''}`} onClick={() => setMetric('hit')}>
+            Hit %
+          </button>
+          <button className={`chip ${!isHit ? 'active' : ''}`} onClick={() => setMetric('darts')}>
+            Darts / game
+          </button>
+        </div>
+        <div className="chart-wrap">
+          <Line data={lineData} options={lineOptsMetric} />
+        </div>
+      </section>
       <ChartCard title="Avg Darts to Clear" subtitle="Average darts to clear a leg, by variant (lower is better).">
         <Bar data={dartsData} options={barOpts} />
       </ChartCard>
