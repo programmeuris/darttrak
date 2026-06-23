@@ -190,6 +190,7 @@ export interface AtcMatchPoint {
   label: string;
   ring: AtcRing;
   hitRate: number;
+  darts: number; // total darts the player threw that game
   avgDartsToClear: number;
 }
 
@@ -205,6 +206,7 @@ export function atcPerMatch(matches: Match[], playerId: string): AtcMatchPoint[]
       label: new Date(m.date).toLocaleDateString(),
       ring: ringOf(m),
       hitRate: atcHitRate(m.legs, playerId),
+      darts: atcDartsThrown(m.legs, playerId),
       avgDartsToClear: wonLegDarts.length
         ? wonLegDarts.reduce((a, b) => a + b, 0) / wonLegDarts.length
         : 0,
@@ -214,22 +216,22 @@ export function atcPerMatch(matches: Match[], playerId: string): AtcMatchPoint[]
 
 export interface AtcVariantSeries {
   ring: AtcRing;
-  points: { date: number; label: string; hitRate: number }[]; // oldest → newest
+  points: { date: number; label: string; hitRate: number; darts: number }[]; // oldest → newest
 }
 
 /**
- * Hit-rate series split by variant, each indexed by its own game count rather
+ * Per-game series split by variant, each indexed by its own game count rather
  * than a shared date axis. This lets the chart align every variant at game 1
  * (instead of interleaving them by date, which collides on same-day games).
  * Returned in ring order; rings with no games are omitted.
  */
-export function atcHitRateSeriesByVariant(matches: Match[], playerId: string): AtcVariantSeries[] {
+export function atcSeriesByVariant(matches: Match[], playerId: string): AtcVariantSeries[] {
   const points = atcPerMatch(matches, playerId);
   const out: AtcVariantSeries[] = [];
   for (const ring of ATC_RING_ORDER) {
     const pts = points
       .filter((p) => p.ring === ring)
-      .map((p) => ({ date: p.date, label: p.label, hitRate: p.hitRate }));
+      .map((p) => ({ date: p.date, label: p.label, hitRate: p.hitRate, darts: p.darts }));
     if (pts.length) out.push({ ring, points: pts });
   }
   return out;

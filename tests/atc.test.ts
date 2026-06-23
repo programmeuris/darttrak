@@ -14,7 +14,7 @@ import {
   atcStatsByVariant,
   atcPerMatch,
   atcProgressiveSteps,
-  atcHitRateSeriesByVariant,
+  atcSeriesByVariant,
 } from '../src/atc';
 import {
   atcHitDart,
@@ -224,7 +224,7 @@ describe('analytics by variant', () => {
     const prog1 = atcMatch('prog1', 1000, 'progressive', A);
     const prog2 = atcMatch('prog2', 3000, 'progressive', A);
     const single1 = atcMatch('single1', 2000, 'single', A);
-    const series = atcHitRateSeriesByVariant([prog2, single1, prog1], A);
+    const series = atcSeriesByVariant([prog2, single1, prog1], A);
 
     // Ring order, only rings that were played.
     expect(series.map((s) => s.ring)).toEqual(['single', 'progressive']);
@@ -233,5 +233,7 @@ describe('analytics by variant', () => {
       1000, 3000,
     ]);
     expect(series.find((s) => s.ring === 'single')!.points.map((p) => p.date)).toEqual([2000]);
+    // Each point also carries the darts thrown that game (21 per cleared leg here).
+    expect(series.find((s) => s.ring === 'single')!.points[0].darts).toBe(21);
   });
 });
