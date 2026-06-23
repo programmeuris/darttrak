@@ -14,6 +14,7 @@ import {
   atcStatsByVariant,
   atcPerMatch,
   atcProgressiveSteps,
+  atcHitRateSeriesByVariant,
 } from '../src/atc';
 import {
   atcHitDart,
@@ -216,5 +217,21 @@ describe('analytics by variant', () => {
     const points = atcPerMatch([m3, m1, m2], A);
     expect(points.map((p) => p.date)).toEqual([1000, 2000, 3000]);
     expect(points.map((p) => p.ring)).toEqual(['single', 'progressive', 'double']);
+  });
+
+  it('splits hit-rate series per variant, each indexed from its own game 1', () => {
+    // Two progressive games and one single game, passed out of order.
+    const prog1 = atcMatch('prog1', 1000, 'progressive', A);
+    const prog2 = atcMatch('prog2', 3000, 'progressive', A);
+    const single1 = atcMatch('single1', 2000, 'single', A);
+    const series = atcHitRateSeriesByVariant([prog2, single1, prog1], A);
+
+    // Ring order, only rings that were played.
+    expect(series.map((s) => s.ring)).toEqual(['single', 'progressive']);
+    // Each variant is its own oldest→newest sequence (both start at index 0).
+    expect(series.find((s) => s.ring === 'progressive')!.points.map((p) => p.date)).toEqual([
+      1000, 3000,
+    ]);
+    expect(series.find((s) => s.ring === 'single')!.points.map((p) => p.date)).toEqual([2000]);
   });
 });
