@@ -239,9 +239,6 @@ export function LiveAtc({ matchId }: { matchId: string }) {
 
       {ring === 'progressive' ? (
         <div className="atc-prog-actions">
-          <button className="btn miss-btn" disabled={inputLocked} onClick={() => addStep(0)}>
-            Miss ✗
-          </button>
           <button className="btn hit-btn" disabled={inputLocked} onClick={() => addStep(1)}>
             Hit +1
           </button>
@@ -250,6 +247,9 @@ export function LiveAtc({ matchId }: { matchId: string }) {
           </button>
           <button className="btn hit-btn" disabled={inputLocked || onBull} onClick={() => addStep(3)}>
             Treble +3
+          </button>
+          <button className="btn miss-btn" disabled={inputLocked} onClick={() => addStep(0)}>
+            Miss ✗
           </button>
         </div>
       ) : (
