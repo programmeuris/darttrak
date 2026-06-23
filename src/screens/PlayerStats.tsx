@@ -97,13 +97,38 @@ const TABS: { id: TabId; label: string; group: 'x01' | 'mode' }[] = [
   { id: 'atc', label: 'Around the Clock', group: 'mode' },
 ];
 
+// Remember the last-open tab per player (a per-device UI preference, so it lives
+// in localStorage rather than the player/data model). Falls back to overview.
+const TAB_IDS = new Set<string>(TABS.map((t) => t.id));
+const tabStorageKey = (playerId: string) => `darttrak:statsTab:${playerId}`;
+
+function readStoredTab(playerId: string): TabId {
+  try {
+    const v = localStorage.getItem(tabStorageKey(playerId));
+    if (v && TAB_IDS.has(v)) return v as TabId;
+  } catch {
+    // localStorage can be unavailable (private mode); fall back silently.
+  }
+  return 'overview';
+}
+
+function writeStoredTab(playerId: string, tab: TabId): void {
+  try {
+    localStorage.setItem(tabStorageKey(playerId), tab);
+  } catch {
+    // ignore write failures
+  }
+}
+
 // When `playerId` is passed (from a player profile) the screen locks to that
 // player and hides the picker; without it, it keeps the standalone dropdown.
 export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedId, setSelectedId] = useState('');
-  const [tab, setTab] = useState<TabId>('overview');
+  // Locked player is known on mount, so seed from storage to avoid a flash;
+  // the global view seeds once the player resolves (effect below).
+  const [tab, setTab] = useState<TabId>(() => (lockedId ? readStoredTab(lockedId) : 'overview'));
 
   useEffect(() => {
     Promise.all([getPlayers(), getAllMatches()]).then(([ps, ms]) => {
@@ -114,6 +139,17 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
   }, [lockedId]);
 
   const playerId = lockedId ?? selectedId;
+
+  // Restore the remembered tab whenever the active player changes (including the
+  // dropdown switching players on the global view).
+  useEffect(() => {
+    if (playerId) setTab(readStoredTab(playerId));
+  }, [playerId]);
+
+  function selectTab(t: TabId) {
+    setTab(t);
+    if (playerId) writeStoredTab(playerId, t);
+  }
   const names = new Map(players.map((p) => [p.id, p.name]));
   const onBack = () => navigate(lockedId ? `/player/${lockedId}` : '/');
 
@@ -148,7 +184,7 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
         {TABS.map((t, i) => (
           <Fragment key={t.id}>
             {i > 0 && TABS[i - 1].group !== t.group && <span className="tab-sep" aria-hidden="true" />}
-            <button className={`tab ${t.id === tab ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+            <button className={`tab ${t.id === tab ? 'active' : ''}`} onClick={() => selectTab(t.id)}>
               {t.label}
             </button>
           </Fragment>

@@ -19,6 +19,7 @@ import { makeMatch, makeLeg, makeTurn, S, atcHitDart } from './helpers';
 afterEach(async () => {
   cleanup();
   location.hash = '';
+  localStorage.clear();
   await importAllData({ players: [], matches: [] }); // reset the shared fake DB
 });
 
@@ -291,6 +292,30 @@ describe('player profiles', () => {
     expect(screen.queryByText('All players')).toBeNull();
     // The standalone picker label is not rendered in locked mode.
     expect(screen.queryByText('Player')).toBeNull();
+  });
+
+  it('PlayerStats remembers the last-open tab per player', async () => {
+    const alice = await addPlayer('Alice');
+    const bob = await addPlayer('Bob');
+
+    // Open Alice's stats and switch to Consistency.
+    render(<PlayerStats playerId={alice.id} />);
+    await screen.findByText('Alice · Stats');
+    fireEvent.click(screen.getByText('Consistency'));
+    expect(localStorage.getItem(`darttrak:statsTab:${alice.id}`)).toBe('consistency');
+    cleanup();
+
+    // Re-opening Alice restores Consistency as the active tab.
+    render(<PlayerStats playerId={alice.id} />);
+    await screen.findByText('Alice · Stats');
+    expect(screen.getByText('Consistency').className).toContain('active');
+    expect(screen.getByText('Overview').className).not.toContain('active');
+    cleanup();
+
+    // Bob has his own memory and defaults to Overview.
+    render(<PlayerStats playerId={bob.id} />);
+    await screen.findByText('Bob · Stats');
+    expect(screen.getByText('Overview').className).toContain('active');
   });
 
   it('PlayerStats ATC chart toggles between Hit % and Darts/game', async () => {
