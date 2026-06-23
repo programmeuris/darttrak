@@ -478,6 +478,12 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
       },
     ],
   };
+  // The bars are coloured per variant and labelled on the x-axis, so the
+  // single-series legend would only show one colour — hide it as redundant.
+  const dartsOpts: ChartOptions<'bar'> = {
+    ...barOpts,
+    plugins: { ...barOpts.plugins, legend: { display: false } },
+  };
   return (
     <>
       {variants.map((v) => (
@@ -512,7 +518,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         </div>
       </section>
       <ChartCard title="Avg Darts to Clear" subtitle="Average darts to clear a leg, by variant (lower is better).">
-        <Bar data={dartsData} options={barOpts} />
+        <Bar data={dartsData} options={dartsOpts} />
       </ChartCard>
     </>
   );
