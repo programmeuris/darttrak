@@ -31,9 +31,10 @@ Two reasons:
 - **Match summary** with per-player 3-dart average, highest turn, 180s, 100+/140+
   counts, darts thrown, checkout % and best checkout
 - **Match history** with player / game-type filters and full turn-by-turn breakdowns
-- **Player stats** with Chart.js, in tabs: Overview, Consistency, Finishing,
-  Scoring, Head-to-Head, and a dedicated **Around the Clock** tab split by
-  ring/variant (hit-rate trend and average darts-to-clear)
+- **Player stats** with Chart.js, organised by game mode: an **x01** mode with
+  Overview, Consistency, Finishing, Scoring and Head-to-Head lenses, and an
+  **Around the Clock** mode split by ring/variant (per-game Hit % / darts toggle
+  and average darts-to-clear). Each player's last-viewed tab is remembered.
 - **Backup & restore**: export all data to JSON and re-import it (your only backup)
 - **Installable PWA** — works offline once loaded; "Add to Home Screen" on
   Chrome / Safari
