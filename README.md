@@ -4,6 +4,19 @@ A fully local, offline-capable darts score tracking Progressive Web App (PWA).
 Built with **React**, **TypeScript**, and **Vite**. No backend, no accounts, no
 external connections — all data is stored in your browser via **IndexedDB**.
 
+## Why I built this
+
+Two reasons:
+
+- **To explore agentic coding.** I'm interested in how far AI coding agents can
+  go on a real, evolving project, so this app is built almost entirely through
+  agentic workflows. I plan to go back and analyse the generated code later — how
+  it's structured, where it holds up, and where it doesn't.
+- **To track a new hobby without a subscription.** I recently picked up darts and
+  wanted a simple way to record my games and watch my stats improve over time —
+  without paying a monthly fee for it. So DartTrak is fully local and free: your
+  data stays in your browser, and there's nothing to sign up for.
+
 ## Features
 
 - **501 / 301** scoring with configurable **Double Out** and best-of-1/3/5 leg formats
