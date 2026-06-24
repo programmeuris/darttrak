@@ -13,6 +13,8 @@ import type { Player, ExportBundle } from '../types';
 export function Home() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [name, setName] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<Player | null>(null);
+  const [exportedBeforeDelete, setExportedBeforeDelete] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => getPlayers().then(setPlayers);
@@ -32,11 +34,18 @@ export function Home() {
     toast(`Added ${trimmed}`);
   }
 
-  async function handleDelete(p: Player) {
-    if (!confirmDialog(`Delete player "${p.name}"?`)) return;
-    await deletePlayer(p.id);
+  function handleDelete(p: Player) {
+    setExportedBeforeDelete(false);
+    setPendingDelete(p);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const { id, name } = pendingDelete;
+    setPendingDelete(null);
+    await deletePlayer(id);
     await refresh();
-    toast(`Deleted ${p.name}`);
+    toast(`Deleted ${name} and their matches`);
   }
 
   async function handleExport() {
@@ -157,6 +166,40 @@ export function Home() {
           onChange={handleImport}
         />
       </section>
+
+      {pendingDelete && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPendingDelete(null)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="card-title">Delete “{pendingDelete.name}”?</h2>
+            <p className="muted">
+              This permanently removes {pendingDelete.name} and every match they played — it
+              can’t be undone. Export a backup first if you might want this data back.
+            </p>
+            <div className="modal-actions">
+              <button
+                className="btn"
+                onClick={async () => {
+                  await handleExport();
+                  setExportedBeforeDelete(true);
+                }}
+              >
+                {exportedBeforeDelete ? '✓ Backup saved' : '⬇ Export backup'}
+              </button>
+              <button className="btn" onClick={() => setPendingDelete(null)}>
+                Cancel
+              </button>
+              <button className="btn danger" onClick={confirmDelete}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
