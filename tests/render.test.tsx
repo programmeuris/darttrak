@@ -40,6 +40,20 @@ describe('screens render without crashing', () => {
     expect(await screen.findByText('Alice')).toBeTruthy();
   });
 
+  it('Home delete asks for confirmation (with an export option) before removing', async () => {
+    await addPlayer('Alice');
+    render(<Home />);
+    fireEvent.click(await screen.findByLabelText('Delete Alice'));
+
+    // The modal offers an export-first option and has not deleted anything yet.
+    expect(screen.getByText('⬇ Export backup')).toBeTruthy();
+    expect(screen.getByLabelText("Open Alice's profile")).toBeTruthy();
+
+    // Confirming clears the player (and, via cascade, their matches).
+    fireEvent.click(screen.getByText('Delete'));
+    await waitFor(() => expect(screen.getByText('No players yet. Add one below.')).toBeTruthy());
+  });
+
   it('Setup renders game-type options and shows the ATC ring picker', async () => {
     render(<Setup />);
     expect(screen.getByText('Game Type')).toBeTruthy();

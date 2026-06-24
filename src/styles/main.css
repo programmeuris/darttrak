@@ -901,3 +901,33 @@ body {
   background: var(--accent);
   color: #fff;
 }
+
+/* ---- Modal (confirm dialogs with custom actions) ---- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.6);
+}
+.modal {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.modal-actions .btn {
+  flex: 1 1 auto;
+}

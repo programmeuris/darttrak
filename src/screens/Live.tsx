@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../router';
 import { toast, confirmDialog } from '../toast';
-import { getMatch, getPlayers, saveMatch } from '../db';
+import { getMatch, getPlayers, saveMatch, uuid } from '../db';
 import { startingScore, evaluateTurn, isBust, isWinningTurn } from '../scoring';
 import { suggestCheckout } from '../checkout';
-import { uuid } from '../db';
 import type { Match, Leg, Turn, DartThrow, Player } from '../types';
 
 function startScore(match: Match): number {

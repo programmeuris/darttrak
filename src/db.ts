@@ -71,7 +71,15 @@ export async function addPlayer(name: string): Promise<Player> {
 
 export async function deletePlayer(id: string): Promise<void> {
   const db = await getDB();
-  await db.delete('players', id);
+  const tx = db.transaction(['players', 'matches'], 'readwrite');
+  await tx.objectStore('players').delete(id);
+  // Cascade: remove any match this player took part in, so no match is left
+  // referencing a now-missing player.
+  const matchStore = tx.objectStore('matches');
+  for (const match of await matchStore.getAll()) {
+    if (match.playerIds.includes(id)) await matchStore.delete(match.id);
+  }
+  await tx.done;
 }
 
 // ---- Matches ----
@@ -111,16 +119,39 @@ export async function exportAllData(): Promise<ExportBundle> {
   return { players, matches };
 }
 
+// Minimal shape guards — this is a local-only DB, so the goal is just to keep a
+// malformed backup from persisting records that crash screens later (missing
+// id / playerIds / legs), not to fully validate every field.
+function isValidPlayer(p: unknown): p is Player {
+  return (
+    typeof p === 'object' &&
+    p !== null &&
+    typeof (p as Player).id === 'string' &&
+    typeof (p as Player).name === 'string'
+  );
+}
+function isValidMatch(m: unknown): m is Match {
+  return (
+    typeof m === 'object' &&
+    m !== null &&
+    typeof (m as Match).id === 'string' &&
+    Array.isArray((m as Match).playerIds) &&
+    Array.isArray((m as Match).legs)
+  );
+}
+
 export async function importAllData(data: ExportBundle): Promise<void> {
+  const players = (data.players ?? []).filter(isValidPlayer);
+  const matches = (data.matches ?? []).filter(isValidMatch);
   const db = await getDB();
   const tx = db.transaction(['players', 'matches'], 'readwrite');
   // Overwrite existing data
   await tx.objectStore('players').clear();
   await tx.objectStore('matches').clear();
-  for (const player of data.players ?? []) {
+  for (const player of players) {
     await tx.objectStore('players').put(player);
   }
-  for (const match of data.matches ?? []) {
+  for (const match of matches) {
     await tx.objectStore('matches').put(match);
   }
   await tx.done;
