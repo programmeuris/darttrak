@@ -33,8 +33,9 @@ Two reasons:
 - **Match history** with player / game-type filters and full turn-by-turn breakdowns
 - **Player stats** with Chart.js, organised by game mode: an **x01** mode with
   Overview, Consistency, Finishing, Scoring and Head-to-Head lenses, and an
-  **Around the Clock** mode split by ring/variant (per-game Hit % / darts toggle
-  and average darts-to-clear). Each player's last-viewed tab is remembered.
+  **Around the Clock** mode split by ring/variant — each variant gets a per-game
+  chart pairing Hit % and throws-to-finish, plus an average darts-to-clear
+  comparison. Each player's last-viewed tab is remembered.
 - **Backup & restore**: export all data to JSON and re-import it (your only backup)
 - **Installable PWA** — works offline once loaded; "Add to Home Screen" on
   Chrome / Safari
