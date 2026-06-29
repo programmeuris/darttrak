@@ -474,87 +474,79 @@ function HeadToHead({ matches, playerId, names }: { matches: Match[]; playerId: 
 
 function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
   const variants = atcStatsByVariant(matches, playerId);
+  const [activeRing, setActiveRing] = useState<AtcRing | null>(null);
   if (variants.length === 0) return <Empty text="No completed Around the Clock matches yet." />;
-  // Each variant is indexed by its own game count so its chart starts at game 1,
-  // rather than sharing a date axis where same-day games collide.
+
+  // One variant is shown at a time, picked from the selector below. Each variant
+  // is indexed by its own game count so its chart starts at game 1.
   const pointsByRing = new Map(
     atcSeriesByVariant(matches, playerId).map((s) => [s.ring, s.points]),
   );
-
-  const dartsData: ChartData<'bar'> = {
-    labels: variants.map((v) => atcRingLabel(v.ring)),
+  const active = variants.find((v) => v.ring === activeRing) ?? variants[0];
+  const points = pointsByRing.get(active.ring) ?? [];
+  const chartData: ChartData<'line'> = {
+    labels: points.map((_, i) => `Game ${i + 1}`),
     datasets: [
       {
-        label: 'Avg darts to clear',
-        data: variants.map((v) => round(v.avgDartsToClear)),
-        backgroundColor: variants.map((v) => RING_COLORS[v.ring]),
+        label: 'Hit %',
+        data: points.map((p) => round(p.hitRate)),
+        borderColor: BLUE,
+        backgroundColor: BLUE,
+        tension: 0.25,
+        pointRadius: 3,
+        yAxisID: 'y',
+      },
+      {
+        label: 'Darts / game',
+        data: points.map((p) => p.darts),
+        borderColor: AMBER,
+        backgroundColor: AMBER,
+        borderDash: [5, 4],
+        tension: 0.25,
+        pointRadius: 3,
+        yAxisID: 'yDarts',
       },
     ],
-  };
-  // The bars are coloured per variant and labelled on the x-axis, so the
-  // single-series legend would only show one colour — hide it as redundant.
-  const dartsOpts: ChartOptions<'bar'> = {
-    ...barOpts,
-    plugins: { ...barOpts.plugins, legend: { display: false } },
   };
 
   return (
     <>
-      {variants.map((v) => {
-        const points = pointsByRing.get(v.ring) ?? [];
-        const chartData: ChartData<'line'> = {
-          labels: points.map((_, i) => `Game ${i + 1}`),
-          datasets: [
-            {
-              label: 'Hit %',
-              data: points.map((p) => round(p.hitRate)),
-              borderColor: BLUE,
-              backgroundColor: BLUE,
-              tension: 0.25,
-              pointRadius: 3,
-              yAxisID: 'y',
-            },
-            {
-              label: 'Darts / game',
-              data: points.map((p) => p.darts),
-              borderColor: AMBER,
-              backgroundColor: AMBER,
-              borderDash: [5, 4],
-              tension: 0.25,
-              pointRadius: 3,
-              yAxisID: 'yDarts',
-            },
-          ],
-        };
-        return (
-          <section className="card" key={v.ring}>
-            <h2 className="card-title">
-              <span className="ring-dot" style={{ background: RING_COLORS[v.ring] }} />{' '}
+      {variants.length > 1 && (
+        <div className="chip-row">
+          {variants.map((v) => (
+            <button
+              key={v.ring}
+              className={`chip ${v.ring === active.ring ? 'active' : ''}`}
+              onClick={() => setActiveRing(v.ring)}
+            >
               {atcRingLabel(v.ring)}
-            </h2>
-            <Grid
-              cells={[
-                [String(v.competitivePlayed), `Played (${v.played} total)`],
-                [v.competitivePlayed === 0 ? '—' : `${v.winRate.toFixed(0)}%`, 'Win Rate'],
-                [`${v.hitRate.toFixed(0)}%`, 'Hit Rate'],
-                [v.fewestToClear > 0 ? String(v.fewestToClear) : '—', 'Fewest Darts'],
-                [v.avgDartsToClear > 0 ? v.avgDartsToClear.toFixed(0) : '—', 'Avg Darts'],
-              ]}
-            />
-            {points.length > 0 && (
-              <>
-                <p className="muted">Hit % and throws to finish, per game.</p>
-                <div className="chart-wrap">
-                  <Line data={chartData} options={atcVariantOpts(points)} />
-                </div>
-              </>
-            )}
-          </section>
-        );
-      })}
-      <ChartCard title="Avg Darts to Clear" subtitle="Average darts to clear a leg, by variant (lower is better).">
-        <Bar data={dartsData} options={dartsOpts} />
-      </ChartCard>
+            </button>
+          ))}
+        </div>
+      )}
+      <section className="card" key={active.ring}>
+        <h2 className="card-title">
+          <span className="ring-dot" style={{ background: RING_COLORS[active.ring] }} />{' '}
+          {atcRingLabel(active.ring)}
+        </h2>
+        <Grid
+          cells={[
+            [String(active.competitivePlayed), `Played (${active.played} total)`],
+            [active.competitivePlayed === 0 ? '—' : `${active.winRate.toFixed(0)}%`, 'Win Rate'],
+            [`${active.hitRate.toFixed(0)}%`, 'Hit Rate'],
+            [active.fewestToClear > 0 ? String(active.fewestToClear) : '—', 'Fewest Darts'],
+            [active.avgDartsToClear > 0 ? active.avgDartsToClear.toFixed(0) : '—', 'Avg Darts'],
+          ]}
+        />
+        {points.length > 0 && (
+          <>
+            <p className="muted">Hit % and throws to finish, per game.</p>
+            <div className="chart-wrap">
+              <Line data={chartData} options={atcVariantOpts(points)} />
+            </div>
+          </>
+        )}
+      </section>
     </>
   );
 }
