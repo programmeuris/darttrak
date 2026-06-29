@@ -348,27 +348,36 @@ describe('player profiles', () => {
     expect(screen.getByText('Consistency').className).toContain('active');
   });
 
-  it('PlayerStats ATC shows a per-variant chart of Hit % and throws to finish', async () => {
+  it('PlayerStats ATC toggles between per-variant combined charts', async () => {
     const alice = await addPlayer('Alice');
-    await saveMatch(
-      makeMatch({
-        id: 'atc-prog-stats',
-        gameType: 'AroundTheClock',
-        atcRing: 'progressive',
-        playerIds: [alice.id],
-        status: 'completed',
-        winnerId: alice.id,
-        legs: [makeLeg('atc-prog-stats', [makeTurn(alice.id, [atcHitDart(1)], 1)], alice.id)],
-      }),
-    );
+    // Two variants so the selector appears.
+    for (const ring of ['single', 'progressive'] as const) {
+      await saveMatch(
+        makeMatch({
+          id: `atc-${ring}`,
+          gameType: 'AroundTheClock',
+          atcRing: ring,
+          playerIds: [alice.id],
+          status: 'completed',
+          winnerId: alice.id,
+          legs: [makeLeg(`atc-${ring}`, [makeTurn(alice.id, [atcHitDart(1)], 1)], alice.id)],
+        }),
+      );
+    }
     render(<PlayerStats playerId={alice.id} />);
     fireEvent.click(await screen.findByText('Around the Clock'));
 
-    // Each variant card now pairs both metrics in one chart — and the old
-    // Hit%/Darts toggle is gone.
-    expect(await screen.findByText('Progressive')).toBeTruthy();
-    expect(screen.getByText('Hit % and throws to finish, per game.')).toBeTruthy();
+    // Only one variant's combined chart is shown — no bar chart, no metric toggle.
+    expect(screen.getAllByText('Hit % and throws to finish, per game.')).toHaveLength(1);
+    expect(screen.queryByText('Avg Darts to Clear')).toBeNull();
     expect(screen.queryByText('Darts / game')).toBeNull();
+
+    // 'Any' (ring order first) is active by default; the selector switches subtype.
+    expect(screen.getByRole('button', { name: 'Any' }).className).toContain('active');
+    const progChip = screen.getByRole('button', { name: 'Progressive' });
+    fireEvent.click(progChip);
+    expect(progChip.className).toContain('active');
+    expect(screen.getByRole('button', { name: 'Any' }).className).not.toContain('active');
   });
 
   it('History scopes to one player and hides the player filter', async () => {
