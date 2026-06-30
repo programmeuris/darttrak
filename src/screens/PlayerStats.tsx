@@ -7,7 +7,8 @@ import { Header, StatCell } from '../components/Header';
 import { getPlayers, getAllMatches } from '../db';
 import { computePlayerOverview, averagePerMatch, scoreDistribution } from '../stats';
 import { consistencyStats, finishingStats, scoringStats, headToHead } from '../analysis';
-import { atcStatsByVariant, atcSeriesByVariant, atcRingLabel } from '../atc';
+import { atcStatsByVariant, atcSeriesByVariant, atcTargetStats, atcRingLabel } from '../atc';
+import type { AtcTargetStat } from '../atc';
 import type { Player, Match, AtcRing } from '../types';
 
 const TEXT = '#eaeaea';
@@ -484,6 +485,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
   );
   const active = variants.find((v) => v.ring === activeRing) ?? variants[0];
   const points = pointsByRing.get(active.ring) ?? [];
+  const targets = atcTargetStats(matches, playerId, active.ring);
   const chartData: ChartData<'line'> = {
     labels: points.map((_, i) => `Game ${i + 1}`),
     datasets: [
@@ -547,6 +549,52 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
           </>
         )}
       </section>
+      <AtcTargets targets={targets} color={RING_COLORS[active.ring]} />
     </>
+  );
+}
+
+// Hit rate for each number/bull, scoped to the active variant. The dart records
+// don't store the aimed target, so atcTargetStats reconstructs it from progress.
+function AtcTargets({ targets, color }: { targets: AtcTargetStat[]; color: string }) {
+  const thrown = targets.filter((t) => t.darts > 0);
+  if (thrown.length === 0) return null;
+  return (
+    <section className="card">
+      <h2 className="card-title">Hit % By Area</h2>
+      <p className="muted">Average across every game of this variant.</p>
+      <table className="area-table">
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th className="num">Hit %</th>
+            <th className="num">Hits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {targets.map((t) => (
+            <tr key={t.target} className={t.darts === 0 ? 'no-data' : ''}>
+              <td className="area-name">{t.label}</td>
+              <td className="num">
+                {t.darts === 0 ? (
+                  '—'
+                ) : (
+                  <span className="area-bar-cell">
+                    <span className="area-bar-track">
+                      <span
+                        className="area-bar-fill"
+                        style={{ width: `${t.hitRate}%`, background: color }}
+                      />
+                    </span>
+                    <span className="area-pct">{t.hitRate.toFixed(0)}%</span>
+                  </span>
+                )}
+              </td>
+              <td className="num">{t.darts === 0 ? '—' : `${t.hits}/${t.darts}`}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }

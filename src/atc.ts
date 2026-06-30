@@ -185,6 +185,59 @@ export function atcStatsByVariant(matches: Match[], playerId: string): AtcVarian
   return out;
 }
 
+export interface AtcTargetStat {
+  target: number; // the number aimed at (1..20, or 25 for the bull)
+  label: string; // display label for the target in this ring (e.g. "7", "D7", "Bull")
+  hits: number;
+  darts: number; // darts thrown while this was the live target
+  hitRate: number; // 0 when no darts were thrown at this target
+}
+
+/**
+ * Per-target hit rate for one variant. The dart records don't store which
+ * target each dart aimed at, so we reconstruct it: within every leg we walk the
+ * player's darts in throw order, and the live target is `ATC_SEQUENCE[progress]`
+ * before the dart lands. A hit (score > 0) advances progress — by more than one
+ * step in progressive — so the skipped targets are never counted as attempts.
+ * Aggregated across all completed games of the given ring; returned in sequence
+ * order with every target present (darts: 0 for targets never faced).
+ */
+export function atcTargetStats(
+  matches: Match[],
+  playerId: string,
+  ring: AtcRing,
+): AtcTargetStat[] {
+  const hits = new Map<number, number>();
+  const darts = new Map<number, number>();
+  const group = atcMatchesFor(matches, playerId).filter((m) => ringOf(m) === ring);
+  for (const match of group) {
+    for (const leg of match.legs) {
+      let progress = 0;
+      for (const turn of leg.turns) {
+        if (turn.playerId !== playerId) continue;
+        for (const d of turn.darts) {
+          if (progress >= ATC_TARGET_COUNT) break;
+          const target = ATC_SEQUENCE[progress];
+          darts.set(target, (darts.get(target) ?? 0) + 1);
+          if (d.score > 0) hits.set(target, (hits.get(target) ?? 0) + 1);
+          progress += d.score;
+        }
+      }
+    }
+  }
+  return ATC_SEQUENCE.map((target) => {
+    const n = darts.get(target) ?? 0;
+    const h = hits.get(target) ?? 0;
+    return {
+      target,
+      label: atcTargetLabel(target, ring),
+      hits: h,
+      darts: n,
+      hitRate: n === 0 ? 0 : (h / n) * 100,
+    };
+  });
+}
+
 export interface AtcMatchPoint {
   date: number;
   label: string;

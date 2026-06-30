@@ -34,8 +34,9 @@ Two reasons:
 - **Player stats** with Chart.js, organised by game mode: an **x01** mode with
   Overview, Consistency, Finishing, Scoring and Head-to-Head lenses, and an
   **Around the Clock** mode with a variant selector (Any / Doubles / Trebles /
-  Progressive) that shows one variant at a time — its stats plus a per-game chart
-  pairing Hit % and throws-to-finish. Each player's last-viewed tab is remembered.
+  Progressive) that shows one variant at a time — its stats, a per-game chart
+  pairing Hit % and throws-to-finish, and a per-area table giving the average hit
+  % for every number/bull in that variant. Each player's last-viewed tab is remembered.
 - **Backup & restore**: export all data to JSON and re-import it (your only backup)
 - **Installable PWA** — works offline once loaded; "Add to Home Screen" on
   Chrome / Safari
