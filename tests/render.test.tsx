@@ -372,9 +372,10 @@ describe('player profiles', () => {
     expect(screen.queryByText('Avg Darts to Clear')).toBeNull();
     expect(screen.queryByText('Darts / game')).toBeNull();
 
-    // The per-area card lists the variant's targets with their hit rate. The
-    // single game has one hit on target 1, so that row reads 100% (1/1).
-    expect(screen.getByText('Hit % By Area')).toBeTruthy();
+    // The per-area breakdown lives in the same card and lists the variant's
+    // targets with their hit rate. The single game has one hit on target 1,
+    // so that row reads 100% (1/1).
+    expect(screen.getByText('Average hit % per area, across every game.')).toBeTruthy();
     expect(screen.getByText('1/1')).toBeTruthy();
 
     // 'Any' (ring order first) is active by default; the selector switches subtype.

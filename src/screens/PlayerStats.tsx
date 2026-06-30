@@ -548,21 +548,21 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             </div>
           </>
         )}
+        <AtcTargets targets={targets} color={RING_COLORS[active.ring]} />
       </section>
-      <AtcTargets targets={targets} color={RING_COLORS[active.ring]} />
     </>
   );
 }
 
-// Hit rate for each number/bull, scoped to the active variant. The dart records
-// don't store the aimed target, so atcTargetStats reconstructs it from progress.
+// Per-area hit rate for the active variant, shown inside the variant card below
+// the chart. The dart records don't store the aimed target, so atcTargetStats
+// reconstructs it from progress.
 function AtcTargets({ targets, color }: { targets: AtcTargetStat[]; color: string }) {
   const thrown = targets.filter((t) => t.darts > 0);
   if (thrown.length === 0) return null;
   return (
-    <section className="card">
-      <h2 className="card-title">Hit % By Area</h2>
-      <p className="muted">Average across every game of this variant.</p>
+    <>
+      <p className="muted">Average hit % per area, across every game.</p>
       <table className="area-table">
         <thead>
           <tr>
@@ -595,6 +595,6 @@ function AtcTargets({ targets, color }: { targets: AtcTargetStat[]; color: strin
           ))}
         </tbody>
       </table>
-    </section>
+    </>
   );
 }
