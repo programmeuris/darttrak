@@ -386,6 +386,40 @@ describe('player profiles', () => {
     expect(screen.getByRole('button', { name: 'Any' }).className).not.toContain('active');
   });
 
+  it('PlayerStats ATC offers an All / Last-20 scope toggle past 20 games', async () => {
+    const alice = await addPlayer('Alice');
+    // 21 single-variant games so the recent-window toggle appears.
+    for (let i = 0; i < 21; i++) {
+      await saveMatch(
+        makeMatch({
+          id: `atc-many-${i}`,
+          date: 1000 + i,
+          gameType: 'AroundTheClock',
+          atcRing: 'single',
+          playerIds: [alice.id],
+          status: 'completed',
+          winnerId: alice.id,
+          legs: [makeLeg(`atc-many-${i}`, [makeTurn(alice.id, [atcHitDart(1)], 1)], alice.id)],
+        }),
+      );
+    }
+    render(<PlayerStats playerId={alice.id} />);
+    fireEvent.click(await screen.findByText('Around the Clock'));
+
+    // "All (21)" is active by default; the area subtitle reflects the full scope.
+    const all = screen.getByRole('button', { name: 'All (21)' });
+    const last = screen.getByRole('button', { name: 'Last 20 games' });
+    expect(all.className).toContain('active');
+    expect(last.className).not.toContain('active');
+    expect(screen.getByText('Average hit % per area, across every game.')).toBeTruthy();
+
+    // Switching to the recent window flips the active state and the subtitle.
+    fireEvent.click(last);
+    expect(last.className).toContain('active');
+    expect(screen.getByRole('button', { name: 'All (21)' }).className).not.toContain('active');
+    expect(screen.getByText('Average hit % per area, across the last 20 games.')).toBeTruthy();
+  });
+
   it('History scopes to one player and hides the player filter', async () => {
     const alice = await addPlayer('Alice');
     const bob = await addPlayer('Bob');

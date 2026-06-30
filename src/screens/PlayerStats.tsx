@@ -7,7 +7,13 @@ import { Header, StatCell } from '../components/Header';
 import { getPlayers, getAllMatches } from '../db';
 import { computePlayerOverview, averagePerMatch, scoreDistribution } from '../stats';
 import { consistencyStats, finishingStats, scoringStats, headToHead } from '../analysis';
-import { atcStatsByVariant, atcSeriesByVariant, atcTargetStats, atcRingLabel } from '../atc';
+import {
+  atcStatsByVariant,
+  atcSeriesByVariant,
+  atcTargetStats,
+  atcVariantMatches,
+  atcRingLabel,
+} from '../atc';
 import type { AtcTargetStat } from '../atc';
 import type { Player, Match, AtcRing } from '../types';
 
@@ -473,19 +479,29 @@ function HeadToHead({ matches, playerId, names }: { matches: Match[]; playerId: 
   );
 }
 
+// How many recent games the "Last N" scope keeps; the toggle only appears once a
+// variant has more games than this.
+const ATC_RECENT_WINDOW = 20;
+
 function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
   const variants = atcStatsByVariant(matches, playerId);
   const [activeRing, setActiveRing] = useState<AtcRing | null>(null);
+  const [recentOnly, setRecentOnly] = useState(false);
   if (variants.length === 0) return <Empty text="No completed Around the Clock matches yet." />;
 
-  // One variant is shown at a time, picked from the selector below. Each variant
-  // is indexed by its own game count so its chart starts at game 1.
-  const pointsByRing = new Map(
-    atcSeriesByVariant(matches, playerId).map((s) => [s.ring, s.points]),
-  );
+  // One variant is shown at a time, picked from the selector below. The chart and
+  // the per-area table reflect either all games of that variant or just the last
+  // ATC_RECENT_WINDOW; the stat grid above stays all-time.
   const active = variants.find((v) => v.ring === activeRing) ?? variants[0];
-  const points = pointsByRing.get(active.ring) ?? [];
-  const targets = atcTargetStats(matches, playerId, active.ring);
+  const variantMatches = atcVariantMatches(matches, playerId, active.ring);
+  const totalGames = variantMatches.length;
+  const canScope = totalGames > ATC_RECENT_WINDOW;
+  const scoped = canScope && recentOnly ? variantMatches.slice(-ATC_RECENT_WINDOW) : variantMatches;
+  // Each variant is indexed by its own game count so its chart starts at game 1.
+  const points = atcSeriesByVariant(scoped, playerId).find((s) => s.ring === active.ring)?.points ?? [];
+  const targets = atcTargetStats(scoped, playerId, active.ring);
+  const scopeNote =
+    canScope && recentOnly ? `the last ${ATC_RECENT_WINDOW} games` : 'every game';
   const chartData: ChartData<'line'> = {
     labels: points.map((_, i) => `Game ${i + 1}`),
     datasets: [
@@ -540,6 +556,22 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             [active.avgDartsToClear > 0 ? active.avgDartsToClear.toFixed(0) : '—', 'Avg Darts'],
           ]}
         />
+        {canScope && (
+          <div className="chip-row scope-row">
+            <button
+              className={`chip ${recentOnly ? '' : 'active'}`}
+              onClick={() => setRecentOnly(false)}
+            >
+              All ({totalGames})
+            </button>
+            <button
+              className={`chip ${recentOnly ? 'active' : ''}`}
+              onClick={() => setRecentOnly(true)}
+            >
+              Last {ATC_RECENT_WINDOW} games
+            </button>
+          </div>
+        )}
         {points.length > 0 && (
           <>
             <p className="muted">Hit % and throws to finish, per game.</p>
@@ -548,7 +580,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             </div>
           </>
         )}
-        <AtcTargets targets={targets} color={RING_COLORS[active.ring]} />
+        <AtcTargets targets={targets} color={RING_COLORS[active.ring]} scopeNote={scopeNote} />
       </section>
     </>
   );
@@ -557,12 +589,20 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
 // Per-area hit rate for the active variant, shown inside the variant card below
 // the chart. The dart records don't store the aimed target, so atcTargetStats
 // reconstructs it from progress.
-function AtcTargets({ targets, color }: { targets: AtcTargetStat[]; color: string }) {
+function AtcTargets({
+  targets,
+  color,
+  scopeNote,
+}: {
+  targets: AtcTargetStat[];
+  color: string;
+  scopeNote: string;
+}) {
   const thrown = targets.filter((t) => t.darts > 0);
   if (thrown.length === 0) return null;
   return (
     <>
-      <p className="muted">Average hit % per area, across every game.</p>
+      <p className="muted">Average hit % per area, across {scopeNote}.</p>
       <table className="area-table">
         <thead>
           <tr>

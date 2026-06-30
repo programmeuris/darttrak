@@ -143,6 +143,11 @@ export function atcMatchesFor(matches: Match[], playerId: string): Match[] {
     .sort((a, b) => a.date - b.date);
 }
 
+/** Completed games of one variant the player took part in, oldest → newest. */
+export function atcVariantMatches(matches: Match[], playerId: string, ring: AtcRing): Match[] {
+  return atcMatchesFor(matches, playerId).filter((m) => ringOf(m) === ring);
+}
+
 export interface AtcVariantStats {
   ring: AtcRing;
   played: number; // all completed games of this variant (solo included)
