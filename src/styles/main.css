@@ -874,6 +874,56 @@ body {
   font-weight: 700;
 }
 
+/* ---- ATC hit % by area ---- */
+.area-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.area-table th,
+.area-table td {
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--surface-2);
+  text-align: left;
+}
+.area-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+.area-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.area-table .area-name {
+  font-weight: 600;
+}
+.area-table .no-data {
+  color: var(--muted);
+}
+.area-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.area-bar-track {
+  flex: 1;
+  max-width: 120px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.area-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+.area-pct {
+  min-width: 36px;
+  text-align: right;
+}
+
 /* ---- Toast ---- */
 .toast {
   position: fixed;

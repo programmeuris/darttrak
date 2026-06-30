@@ -15,6 +15,7 @@ import {
   atcPerMatch,
   atcProgressiveSteps,
   atcSeriesByVariant,
+  atcTargetStats,
 } from '../src/atc';
 import {
   atcHitDart,
@@ -235,5 +236,101 @@ describe('analytics by variant', () => {
     expect(series.find((s) => s.ring === 'single')!.points.map((p) => p.date)).toEqual([2000]);
     // Each point also carries the darts thrown that game (21 per cleared leg here).
     expect(series.find((s) => s.ring === 'single')!.points[0].darts).toBe(21);
+  });
+});
+
+describe('per-area hit rate', () => {
+  // A leg where A misses target 3 twice before hitting it; everything else is a
+  // clean one-dart hit. 23 darts total: 21 hits + 2 misses on the "3".
+  function legWithMissesOn3(player: string): Leg {
+    const turns = [];
+    let prog = 0;
+    // T1: hit 1, hit 2, miss 3
+    turns.push(makeTurn(player, [atcHitDart(1), atcHitDart(2), atcMissDart(3)], (prog = 2)));
+    // T2: miss 3, hit 3, hit 4
+    turns.push(makeTurn(player, [atcMissDart(3), atcHitDart(3), atcHitDart(4)], (prog = 4)));
+    // Remaining targets 5..20 + bull, one hit each (17 hits).
+    while (prog < ATC_TARGET_COUNT) {
+      const darts = [];
+      for (let k = 0; k < 3 && prog < ATC_TARGET_COUNT; k++) {
+        darts.push(atcHitDart(prog + 1));
+        prog++;
+      }
+      turns.push(makeTurn(player, darts, prog));
+    }
+    return makeLeg(`miss3-${player}`, turns, player);
+  }
+
+  it('reconstructs the aimed target and reports hits/darts per area', () => {
+    const m = makeMatch({
+      id: 'area-single',
+      date: 1000,
+      gameType: 'AroundTheClock',
+      playerIds: [A],
+      winnerId: A,
+      atcRing: 'single',
+      legs: [legWithMissesOn3(A)],
+    });
+    const stats = atcTargetStats([m], A, 'single');
+    // Every sequence target is present, in order.
+    expect(stats.map((s) => s.target)).toEqual([...ATC_SEQUENCE]);
+    const three = stats.find((s) => s.target === 3)!;
+    expect(three.darts).toBe(3); // two misses + one hit
+    expect(three.hits).toBe(1);
+    expect(three.hitRate).toBeCloseTo((1 / 3) * 100);
+    // A clean one-hit target is 100%.
+    const seven = stats.find((s) => s.target === 7)!;
+    expect(seven).toMatchObject({ hits: 1, darts: 1, hitRate: 100 });
+    // The bull is labelled for the ring.
+    expect(stats.find((s) => s.target === 25)!.label).toBe('Bull');
+  });
+
+  it('counts a multi-step progressive dart as one attempt on the aimed target only', () => {
+    // A single turn in progressive: treble on 1 (+3 → skips 2 and 3), then a
+    // treble on 4 (+3 → skips 5, 6). Two darts, both hits, on targets 1 and 4.
+    const leg = makeLeg('prog-skip', [
+      makeTurn(A, [atcStepDart(1, 3), atcStepDart(4, 3)], 6),
+    ]);
+    const m = makeMatch({
+      id: 'area-prog',
+      date: 1000,
+      gameType: 'AroundTheClock',
+      playerIds: [A],
+      winnerId: A,
+      atcRing: 'progressive',
+      legs: [leg],
+    });
+    const stats = atcTargetStats([m], A, 'progressive');
+    expect(stats.find((s) => s.target === 1)).toMatchObject({ hits: 1, darts: 1 });
+    expect(stats.find((s) => s.target === 4)).toMatchObject({ hits: 1, darts: 1 });
+    // The skipped targets were never aimed at.
+    for (const skipped of [2, 3, 5, 6]) {
+      expect(stats.find((s) => s.target === skipped)).toMatchObject({ hits: 0, darts: 0 });
+    }
+  });
+
+  it('keeps variants separate — progressive games never count toward Any', () => {
+    const single = makeMatch({
+      id: 's',
+      date: 1000,
+      gameType: 'AroundTheClock',
+      playerIds: [A],
+      winnerId: A,
+      atcRing: 'single',
+      legs: [makeLeg('s-leg', [makeTurn(A, [atcMissDart(1)], 0)], null)],
+    });
+    const prog = makeMatch({
+      id: 'p',
+      date: 2000,
+      gameType: 'AroundTheClock',
+      playerIds: [A],
+      winnerId: A,
+      atcRing: 'progressive',
+      legs: [makeLeg('p-leg', [makeTurn(A, [atcHitDart(1)], 1)], null)],
+    });
+    const singleOne = atcTargetStats([single, prog], A, 'single').find((s) => s.target === 1)!;
+    expect(singleOne).toMatchObject({ hits: 0, darts: 1 }); // only the single game's miss
+    const progOne = atcTargetStats([single, prog], A, 'progressive').find((s) => s.target === 1)!;
+    expect(progOne).toMatchObject({ hits: 1, darts: 1 }); // only the progressive game's hit
   });
 });
