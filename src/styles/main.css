@@ -875,10 +875,14 @@ body {
 }
 
 /* ---- ATC hit % by area ---- */
+.scope-row {
+  margin: 4px 0 12px;
+}
 .area-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.88rem;
+  margin-top: 4px;
 }
 .area-table th,
 .area-table td {

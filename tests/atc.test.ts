@@ -16,6 +16,7 @@ import {
   atcProgressiveSteps,
   atcSeriesByVariant,
   atcTargetStats,
+  atcVariantMatches,
 } from '../src/atc';
 import {
   atcHitDart,
@@ -307,6 +308,29 @@ describe('per-area hit rate', () => {
     for (const skipped of [2, 3, 5, 6]) {
       expect(stats.find((s) => s.target === skipped)).toMatchObject({ hits: 0, darts: 0 });
     }
+  });
+
+  it('lists one variant\'s games oldest→newest, and slicing the tail gives "last N"', () => {
+    const mk = (id: string, date: number, ring: AtcRing) =>
+      makeMatch({
+        id,
+        date,
+        gameType: 'AroundTheClock',
+        playerIds: [A],
+        winnerId: A,
+        atcRing: ring,
+        legs: [makeLeg(id, [makeTurn(A, [atcHitDart(1)], 1)], A)],
+      });
+    const matches = [
+      mk('s2', 2000, 'single'),
+      mk('p1', 1500, 'progressive'),
+      mk('s1', 1000, 'single'),
+      mk('s3', 3000, 'single'),
+    ];
+    const singles = atcVariantMatches(matches, A, 'single');
+    expect(singles.map((m) => m.id)).toEqual(['s1', 's2', 's3']); // sorted, progressive excluded
+    // The component takes the last N for the "recent" scope.
+    expect(singles.slice(-2).map((m) => m.id)).toEqual(['s2', 's3']);
   });
 
   it('keeps variants separate — progressive games never count toward Any', () => {
