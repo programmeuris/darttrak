@@ -25,7 +25,7 @@ Two reasons:
   doubles advance +2 and trebles +3 (each tracked separately in stats)
 - **1–4 players** per match, drawn from a saved roster
 - **Live scoring** screen optimised for mobile: large tap targets, segmented
-  multiplier numpad (Single / Double / Treble + Bull + Miss), real-time bust and
+  multiplier numpad (Single / Double / Treble + Outer/Bull + Miss), real-time bust and
   checkout detection, **checkout suggestions** (e.g. "T20 · T20 · Bull" that
   update as you throw), undo-dart and undo-turn
 - **Match summary** with per-player 3-dart average, highest turn, 180s, 100+/140+

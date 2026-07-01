@@ -38,7 +38,7 @@ function hitsIn(darts: DartThrow[]): number {
 function dartLabel(target: number, steps: number, ring: AtcRing): string {
   if (steps === 0) return `✗${atcTargetLabel(target, ring)}`;
   if (ring === 'progressive') {
-    if (target === 25) return steps === 2 ? 'DB' : 'Bull';
+    if (target === 25) return steps === 2 ? 'Bull' : 'Outer';
     const prefix = steps === 2 ? 'D' : steps === 3 ? 'T' : '';
     return `${prefix}${target}`;
   }

@@ -25,8 +25,10 @@ export function atcRingLabel(ring: AtcRing): string {
  */
 export function atcTargetLabel(target: number, ring: AtcRing): string {
   if (target === 25) {
-    // There is no treble bull; a doubles game finishes on the double bull.
-    return ring === 'double' ? 'DB' : 'Bull';
+    // The bull is the final target in every variant — its outer (25) and bull
+    // (50) rings share one label here since a hit anywhere on it clears it (and
+    // a doubles game must land the bull itself).
+    return 'Bull';
   }
   const prefix = ring === 'double' ? 'D' : ring === 'triple' ? 'T' : '';
   return `${prefix}${target}`;

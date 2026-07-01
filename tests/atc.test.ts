@@ -44,7 +44,7 @@ describe('sequence and labels', () => {
   });
   it('handles the bull, including the no-treble-bull fallback', () => {
     expect(atcTargetLabel(25, 'single')).toBe('Bull');
-    expect(atcTargetLabel(25, 'double')).toBe('DB');
+    expect(atcTargetLabel(25, 'double')).toBe('Bull');
     expect(atcTargetLabel(25, 'triple')).toBe('Bull');
   });
   it('names variants', () => {
