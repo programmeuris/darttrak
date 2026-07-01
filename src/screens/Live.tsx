@@ -123,10 +123,15 @@ export function Live({ matchId }: { matchId: string }) {
 
   async function confirmTurn() {
     if (!match) return;
-    // A turn is three darts. It ends early only on a checkout (win) or a bust;
-    // an ordinary turn must record all three before it can be confirmed.
+    // A turn is three darts. It ends early only on a checkout (win) or a bust.
+    // For an ordinary turn, the first press fills any unthrown darts as misses;
+    // the player presses again to confirm the now-complete turn.
     if (outcome === 'ok' && currentDarts.length < 3) {
-      toast('Throw all 3 darts to finish the turn', 'error');
+      const fill = 3 - currentDarts.length;
+      setCurrentDarts((d) => [
+        ...d,
+        ...Array.from({ length: fill }, () => ({ score: 0, label: 'Miss', isDouble: false })),
+      ]);
       return;
     }
     if (submitting.current) return; // guard against double-tap recording the turn twice
@@ -260,14 +265,15 @@ export function Live({ matchId }: { matchId: string }) {
         </button>
         <button
           className={`btn primary ${outcome === 'bust' ? 'danger' : outcome === 'win' ? 'success' : ''}`}
-          disabled={outcome === 'ok' && currentDarts.length < 3}
           onClick={confirmTurn}
         >
           {outcome === 'win'
             ? 'Confirm Win'
             : outcome === 'bust'
               ? 'Confirm Bust'
-              : `Confirm Turn (${currentDarts.length}/3)`}
+              : currentDarts.length < 3
+                ? `Miss Remaining (${currentDarts.length}/3)`
+                : 'Confirm Turn (3/3)'}
         </button>
       </div>
 
