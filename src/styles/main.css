@@ -8,7 +8,7 @@
   --success: #0f9b58;
   --danger: #e94560;
   --radius: 14px;
-  --tap: 52px;
+  --tap: 56px;
 }
 
 * {
@@ -128,7 +128,7 @@ body {
   color: var(--muted);
 }
 .btn.big {
-  min-height: 60px;
+  min-height: 64px;
   font-size: 1.1rem;
 }
 .btn.full {
@@ -286,7 +286,7 @@ body {
   color: var(--text);
   border-radius: 999px;
   padding: 0 18px;
-  min-height: 48px;
+  min-height: 52px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
@@ -458,7 +458,7 @@ body {
   gap: 10px;
 }
 .atc-prog-actions .btn {
-  min-height: 60px;
+  min-height: 64px;
   font-size: 1.05rem;
 }
 .dart-slot.hit {
@@ -511,7 +511,7 @@ body {
   background: var(--surface);
   border: 1px dashed var(--surface-2);
   border-radius: 10px;
-  min-height: 54px;
+  min-height: 58px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -572,7 +572,7 @@ body {
   background: var(--surface-2);
   color: var(--text);
   border-radius: 10px;
-  min-height: 56px;
+  min-height: 60px;
   font-size: 1.25rem;
   font-weight: 700;
   cursor: pointer;
@@ -799,7 +799,7 @@ body {
   color: var(--muted);
   border-radius: 999px;
   padding: 0 16px;
-  min-height: 44px;
+  min-height: 48px;
   font-size: 0.92rem;
   font-weight: 600;
   white-space: nowrap;
@@ -810,6 +810,13 @@ body {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+/* Stats content sits below the tab bars; space its cards (and the ATC variant
+   selector) so stacked elements never touch. */
+.stats-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 /* Secondary row of x01 lenses nested under the x01 mode (smaller, less prominent). */
 .tab-bar-sub {
