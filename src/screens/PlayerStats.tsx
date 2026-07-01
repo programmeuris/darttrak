@@ -589,6 +589,9 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
 // Per-area hit rate for the active variant, shown inside the variant card below
 // the chart. The dart records don't store the aimed target, so atcTargetStats
 // reconstructs it from progress.
+type AreaSortKey = 'area' | 'hit';
+type AreaSortDir = 'asc' | 'desc';
+
 function AtcTargets({
   targets,
   color,
@@ -598,21 +601,58 @@ function AtcTargets({
   color: string;
   scopeNote: string;
 }) {
+  const [sortKey, setSortKey] = useState<AreaSortKey>('area');
+  const [sortDir, setSortDir] = useState<AreaSortDir>('asc');
   const thrown = targets.filter((t) => t.darts > 0);
   if (thrown.length === 0) return null;
+
+  function toggleSort(key: AreaSortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'hit' ? 'desc' : 'asc'); // hit % reads best highest-first
+    }
+  }
+  const ariaSort = (key: AreaSortKey): 'ascending' | 'descending' | 'none' =>
+    sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+  const caret = (key: AreaSortKey) => (sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+
+  // Areas never thrown at always sink to the bottom in sequence order; the rest
+  // sort by the chosen column, tie-broken by sequence for a stable ordering.
+  const sorted = [...targets].sort((a, b) => {
+    const aEmpty = a.darts === 0;
+    const bEmpty = b.darts === 0;
+    if (aEmpty || bEmpty) {
+      if (aEmpty && bEmpty) return a.target - b.target;
+      return aEmpty ? 1 : -1;
+    }
+    let cmp = sortKey === 'hit' ? a.hitRate - b.hitRate : a.target - b.target;
+    if (cmp === 0) cmp = a.target - b.target;
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
   return (
     <>
       <p className="muted">Average hit % per area, across {scopeNote}.</p>
       <table className="area-table">
         <thead>
           <tr>
-            <th>Area</th>
-            <th className="num">Hit %</th>
+            <th aria-sort={ariaSort('area')}>
+              <button type="button" className="area-sort" onClick={() => toggleSort('area')}>
+                Area{caret('area')}
+              </button>
+            </th>
+            <th className="num" aria-sort={ariaSort('hit')}>
+              <button type="button" className="area-sort" onClick={() => toggleSort('hit')}>
+                Hit %{caret('hit')}
+              </button>
+            </th>
             <th className="num">Hits</th>
           </tr>
         </thead>
         <tbody>
-          {targets.map((t) => (
+          {sorted.map((t) => (
             <tr key={t.target} className={t.darts === 0 ? 'no-data' : ''}>
               <td className="area-name">{t.label}</td>
               <td className="num">
