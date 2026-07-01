@@ -36,9 +36,10 @@ Two reasons:
   **Around the Clock** mode with a variant selector (Any / Doubles / Trebles /
   Progressive) that shows one variant at a time — in a single card: its stats, a
   per-game chart pairing Hit % and throws-to-finish, and a per-area table giving
-  the average hit % for every number/bull in that variant. Once a variant has more
-  than 20 games, an All / Last-20 toggle scopes the chart and the area table. Each
-  player's last-viewed tab is remembered.
+  the average hit % for every number/bull in that variant (sortable by area or hit
+  %, ascending or descending). Once a variant has more than 20 games, an All /
+  Last-20 toggle scopes the chart and the area table. Each player's last-viewed tab
+  is remembered.
 - **Backup & restore**: export all data to JSON and re-import it (your only backup)
 - **Installable PWA** — works offline once loaded; "Add to Home Screen" on
   Chrome / Safari

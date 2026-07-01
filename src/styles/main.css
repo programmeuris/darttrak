@@ -894,6 +894,21 @@ body {
   color: var(--muted);
   font-weight: 600;
 }
+.area-table .area-sort {
+  appearance: none;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.area-table th.num .area-sort {
+  width: 100%;
+  text-align: right;
+}
 .area-table .num {
   text-align: right;
   font-variant-numeric: tabular-nums;

@@ -14,7 +14,7 @@ import { LiveAtc } from '../src/screens/LiveAtc';
 import { Profile } from '../src/screens/Profile';
 import { History } from '../src/screens/History';
 import { addPlayer, saveMatch, getMatch, importAllData } from '../src/db';
-import { makeMatch, makeLeg, makeTurn, S, atcHitDart } from './helpers';
+import { makeMatch, makeLeg, makeTurn, S, atcHitDart, atcMissDart } from './helpers';
 import type { AtcRing } from '../src/types';
 
 afterEach(async () => {
@@ -424,6 +424,52 @@ describe('player profiles', () => {
     expect(last.className).toContain('active');
     expect(screen.getByRole('button', { name: 'All (21)' }).className).not.toContain('active');
     expect(screen.getByText('Average hit % per area, across the last 20 games.')).toBeTruthy();
+  });
+
+  it('PlayerStats ATC area table sorts by area and hit %, both directions', async () => {
+    const alice = await addPlayer('Alice');
+    // One single-variant game whose targets have distinct hit rates so numeric
+    // order and hit-rate order differ: 1 → 50%, 2 → 100%, 3 → 0%.
+    await saveMatch(
+      makeMatch({
+        id: 'atc-sort',
+        gameType: 'AroundTheClock',
+        atcRing: 'single',
+        playerIds: [alice.id],
+        status: 'completed',
+        winnerId: alice.id,
+        legs: [
+          makeLeg(
+            'atc-sort',
+            [
+              makeTurn(alice.id, [atcMissDart(1), atcHitDart(1), atcHitDart(2)], 2),
+              makeTurn(alice.id, [atcMissDart(3), atcMissDart(3)], 2),
+            ],
+            alice.id,
+          ),
+        ],
+      }),
+    );
+    const { container } = render(<PlayerStats playerId={alice.id} />);
+    fireEvent.click(await screen.findByText('Around the Clock'));
+
+    const areaOrder = () =>
+      Array.from(container.querySelectorAll('.area-name')).map((el) => el.textContent);
+
+    // Default: Area ascending — the targets follow sequence order.
+    expect(areaOrder().slice(0, 3)).toEqual(['1', '2', '3']);
+
+    // Hit % sorts highest-first on the first click, lowest-first on the second.
+    fireEvent.click(screen.getByRole('button', { name: 'Hit %' }));
+    expect(areaOrder().slice(0, 3)).toEqual(['2', '1', '3']);
+    fireEvent.click(screen.getByRole('button', { name: /Hit %/ }));
+    expect(areaOrder().slice(0, 3)).toEqual(['3', '1', '2']);
+
+    // Area sorts back to sequence, then reverses on a second click.
+    fireEvent.click(screen.getByRole('button', { name: 'Area' }));
+    expect(areaOrder().slice(0, 3)).toEqual(['1', '2', '3']);
+    fireEvent.click(screen.getByRole('button', { name: /Area/ }));
+    expect(areaOrder().slice(0, 3)).toEqual(['3', '2', '1']);
   });
 
   it('History scopes to one player and hides the player filter', async () => {
