@@ -111,13 +111,14 @@ describe('screens render without crashing', () => {
     expect(await screen.findByText('Alice')).toBeTruthy();
     expect(screen.getByText('501')).toBeTruthy();
 
-    // A turn is three darts: confirm stays disabled until all three are thrown.
+    // A turn is three darts. With fewer thrown, the primary button offers to
+    // fill the rest as misses rather than confirming outright.
     fireEvent.click(screen.getByRole('button', { name: '20' }));
-    expect((screen.getByText('Confirm Turn (1/3)') as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: '20' }));
-    fireEvent.click(screen.getByRole('button', { name: '20' }));
+    const fill = screen.getByText('Miss Remaining (1/3)') as HTMLButtonElement;
+    expect(fill.disabled).toBe(false);
+    fireEvent.click(fill); // fills the two unthrown darts as misses
 
-    // Now enabled; double-click Confirm — the guard must record only one turn.
+    // Now the turn is full; double-click Confirm — the guard records only one.
     const confirm = screen.getByText('Confirm Turn (3/3)');
     fireEvent.click(confirm);
     fireEvent.click(confirm);
@@ -125,6 +126,9 @@ describe('screens render without crashing', () => {
     await waitFor(async () => {
       const saved = await getMatch('m-live');
       expect(saved!.legs[0].turns).toHaveLength(1);
+      // One scoring dart (20) plus two auto-filled misses.
+      expect(saved!.legs[0].turns[0].darts).toHaveLength(3);
+      expect(saved!.legs[0].turns[0].totalScore).toBe(20);
     });
   });
 
@@ -155,7 +159,7 @@ describe('screens render without crashing', () => {
     });
   });
 
-  it('LiveAtc requires three darts before a turn can be confirmed', async () => {
+  it('LiveAtc fills the remaining darts as misses, then confirms on the next press', async () => {
     const alice = await addPlayer('Alice');
     const match = makeMatch({
       id: 'm-atc3',
@@ -170,21 +174,23 @@ describe('screens render without crashing', () => {
     render(<LiveAtc matchId="m-atc3" />);
     const hit = await screen.findByText('HIT ✓');
 
-    // Fewer than three darts: confirm is disabled and the label tracks the count.
-    expect((screen.getByText('Confirm Turn (0/3)') as HTMLButtonElement).disabled).toBe(true);
+    // With darts still unthrown the primary button offers to miss the rest,
+    // and it is enabled (no longer blocked until three are recorded).
+    expect((screen.getByText('Miss Remaining (0/3)') as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(hit);
     fireEvent.click(screen.getByText('HIT ✓'));
-    expect((screen.getByText('Confirm Turn (2/3)') as HTMLButtonElement).disabled).toBe(true);
 
-    // Third dart unlocks confirm and records exactly one turn.
-    fireEvent.click(screen.getByText('HIT ✓'));
+    // First press fills the third dart as a miss; a second confirms the turn.
+    fireEvent.click(screen.getByText('Miss Remaining (2/3)'));
     const confirm = screen.getByText('Confirm Turn (3/3)') as HTMLButtonElement;
-    expect(confirm.disabled).toBe(false);
+    fireEvent.click(confirm);
     fireEvent.click(confirm);
     await waitFor(async () => {
       const saved = await getMatch('m-atc3');
       expect(saved!.legs[0].turns).toHaveLength(1);
+      // Two hits plus one auto-filled miss.
       expect(saved!.legs[0].turns[0].darts).toHaveLength(3);
+      expect(saved!.legs[0].turns[0].totalScore).toBe(2);
     });
   });
 
