@@ -10,8 +10,8 @@ export const S = (n: number): DartThrow => dart(n, String(n));
 export const D = (n: number): DartThrow => dart(n * 2, `D${n}`, true);
 export const T = (n: number): DartThrow => dart(n * 3, `T${n}`);
 export const MISS: DartThrow = dart(0, 'Miss');
-export const BULL: DartThrow = dart(25, 'Bull');
-export const DBULL: DartThrow = dart(50, 'DB', true);
+export const BULL: DartThrow = dart(25, 'Outer');
+export const DBULL: DartThrow = dart(50, 'Bull', true);
 
 // ATC darts: score is the number of targets advanced (0 = miss).
 export const atcHitDart = (n: number): DartThrow => dart(1, `✓${n}`, false);

@@ -101,11 +101,11 @@ export function Live({ matchId }: { matchId: string }) {
       }
       if (multiplier === 2) {
         score = 50;
-        label = 'DB';
+        label = 'Bull';
         isDouble = true;
       } else {
         score = 25;
-        label = 'Bull';
+        label = 'Outer';
         isDouble = false;
       }
     } else if (base === 0) {
@@ -292,7 +292,7 @@ export function Live({ matchId }: { matchId: string }) {
         </div>
         <div className="special-row">
           <button className="num-btn wide bull" disabled={inputLocked} onClick={() => addDart(25, true)}>
-            Bull (25/50)
+            Outer / Bull (25/50)
           </button>
           <button className="num-btn wide miss" disabled={inputLocked} onClick={() => addDart(0, false)}>
             Miss
