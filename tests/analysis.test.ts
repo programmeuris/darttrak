@@ -146,6 +146,38 @@ describe('scoringStats', () => {
     expect(s.over100).toBe(2);
     expect(s.highestVisit).toBe(100);
   });
+
+  it('counts short high finishes like the match Summary does', () => {
+    // A: 100, 91, then a 2-dart 110 checkout (T20 + Bull) — 301 double-out.
+    const shortFinish: Match = makeMatch({
+      id: 'sf',
+      date: 6000,
+      gameType: '301',
+      playerIds: [A],
+      winnerId: A,
+      legs: [
+        makeLeg(
+          'sf',
+          [
+            makeTurn(A, [T(20), S(20), S(20)], 201), // 100
+            makeTurn(A, [T(19), S(20), S(14)], 110), // 91
+            makeTurn(A, [T(20), dart(50, 'Bull', true)], 0), // 110 checkout
+          ],
+          A,
+        ),
+      ],
+    });
+    const st = scoringStats([shortFinish], A);
+    // The 2-dart 110 finish is a real ton-plus visit and the best visit —
+    // previously only full 3-dart visits counted, so Summary and this lens
+    // reported different 100+ totals for the same match.
+    expect(st.over100).toBe(2);
+    expect(st.highestVisit).toBe(110);
+    expect(st.tonPlusRate).toBeCloseTo((2 / 3) * 100, 5);
+    // Consistency still excludes short finishes: their totals aren't
+    // comparable to full 3-dart visits for spread purposes.
+    expect(consistencyStats([shortFinish], A).visits).toBe(2);
+  });
 });
 
 describe('headToHead', () => {
