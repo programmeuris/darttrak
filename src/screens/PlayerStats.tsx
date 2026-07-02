@@ -395,7 +395,7 @@ function Consistency({ matches, playerId }: { matches: Match[]; playerId: string
 
 function Finishing({ matches, playerId }: { matches: Match[]; playerId: string }) {
   const s = finishingStats(matches, playerId);
-  if (s.opportunities === 0) return <Empty text="No checkout opportunities (≤170) recorded yet." />;
+  if (s.opportunities === 0) return <Empty text="No checkout opportunities recorded yet." />;
   const lineData: ChartData<'line'> = {
     labels: s.perMatch.map((p) => p.label),
     datasets: [line('Checkout %', s.perMatch.map((p) => round(p.checkoutPercent)), GREEN, true)],
@@ -415,7 +415,10 @@ function Finishing({ matches, playerId }: { matches: Match[]; playerId: string }
             [s.averageCheckout > 0 ? s.averageCheckout.toFixed(0) : '—', 'Avg Checkout'],
           ]}
         />
-        <p className="muted">Checkout % = legs finished ÷ visits that started ≤170.</p>
+        <p className="muted">
+          Checkout % = legs finished ÷ visits that started in checkout range (≤170 double-out,
+          ≤180 straight-out).
+        </p>
       </section>
       <ChartCard title="Checkout % Per Match">
         <Line data={lineData} options={lineOpts} />

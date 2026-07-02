@@ -164,16 +164,29 @@ function remainingAtTurnStart(turn: Turn): number {
 }
 
 /**
- * Checkout % = winning turns / turns where the player had <= 170 remaining at
- * the start of their turn.
+ * Highest score a turn can start from and still be finished: 170 with
+ * double-out (T20 T20 Bull), 180 straight-out (T20 T20 T20).
  */
-export function calculateCheckoutPercent(legs: Leg[], playerId: string): number {
+export function checkoutCap(doubleOut: boolean): number {
+  return doubleOut ? 170 : 180;
+}
+
+/**
+ * Checkout % = winning turns / turns where the player started within checkout
+ * range (see checkoutCap — the cap depends on the match's double-out setting).
+ */
+export function calculateCheckoutPercent(
+  legs: Leg[],
+  playerId: string,
+  doubleOut = true,
+): number {
+  const cap = checkoutCap(doubleOut);
   const turns = turnsForPlayer(legs, playerId);
   let opportunities = 0;
   let checkouts = 0;
   for (const turn of turns) {
     const start = remainingAtTurnStart(turn);
-    if (start > 0 && start <= 170) {
+    if (start > 0 && start <= cap) {
       opportunities++;
       if (!turn.isBust && turn.remainingScore === 0) checkouts++;
     }

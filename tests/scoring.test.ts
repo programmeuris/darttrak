@@ -123,6 +123,13 @@ describe('per-leg stats', () => {
     // Only the final turn started <= 170 (60); it was taken.
     expect(calculateCheckoutPercent(legs, A)).toBe(100);
   });
+  it('straight-out extends the checkout range to 180', () => {
+    // A 180 finish from a 180 start: a taken chance straight-out, but outside
+    // the double-out range entirely (where 170 is the highest finish).
+    const soLegs = [makeLeg('so', [makeTurn(A, [T(20), T(20), T(20)], 0)], A)];
+    expect(calculateCheckoutPercent(soLegs, A, false)).toBe(100);
+    expect(calculateCheckoutPercent(soLegs, A, true)).toBe(0);
+  });
   it('total darts thrown', () => {
     expect(totalDartsThrown(legs, A)).toBe(7);
   });

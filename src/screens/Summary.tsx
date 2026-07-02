@@ -72,7 +72,7 @@ export function Summary({ matchId }: { matchId: string }) {
       ['100+', String(hs.over100)],
       ['140+', String(hs.over140)],
       ['Darts Thrown', String(totalDartsThrown(match!.legs, id))],
-      ['Checkout %', `${calculateCheckoutPercent(match!.legs, id).toFixed(0)}%`],
+      ['Checkout %', `${calculateCheckoutPercent(match!.legs, id, match!.doubleOut).toFixed(0)}%`],
       ['Best Checkout', best > 0 ? String(best) : '—'],
     ];
   }
