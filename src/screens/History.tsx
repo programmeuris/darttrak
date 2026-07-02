@@ -22,10 +22,15 @@ function MatchList({ lockedPlayerId, base }: { lockedPlayerId?: string; base: st
   const [gameFilter, setGameFilter] = useState<'' | GameType>('');
 
   useEffect(() => {
-    Promise.all([getAllMatches(), getPlayers()]).then(([ms, players]) => {
-      setMatches(ms);
-      setNames(new Map(players.map((p: Player) => [p.id, p.name])));
-    });
+    Promise.all([getAllMatches(), getPlayers()])
+      .then(([ms, players]) => {
+        setMatches(ms);
+        setNames(new Map(players.map((p: Player) => [p.id, p.name])));
+      })
+      .catch((err) => {
+        console.error(err);
+        toast('Failed to load history', 'error');
+      });
   }, []);
 
   const nameOf = (id: string) => names.get(id) ?? 'Unknown';
@@ -36,7 +41,13 @@ function MatchList({ lockedPlayerId, base }: { lockedPlayerId?: string; base: st
 
   async function handleDelete(m: Match) {
     if (!confirmDialog('Delete this match permanently?')) return;
-    await deleteMatch(m.id);
+    try {
+      await deleteMatch(m.id);
+    } catch (err) {
+      console.error(err);
+      toast('Delete failed — nothing was removed. Try again.', 'error');
+      return;
+    }
     setMatches((ms) => ms.filter((x) => x.id !== m.id));
     toast('Match deleted');
   }
@@ -115,9 +126,16 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
         return;
       }
       const players = await getPlayers();
+      if (!active) return;
       setNames(new Map(players.map((p: Player) => [p.id, p.name])));
       setMatch(m);
-    })();
+    })().catch((err) => {
+      // Without this a rejected read strands the user on a blank screen.
+      if (!active) return;
+      console.error(err);
+      toast('Failed to load the match', 'error');
+      navigate(backTo);
+    });
     return () => {
       active = false;
     };

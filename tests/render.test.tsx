@@ -6,6 +6,9 @@ import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/re
 // Chart.js needs a real canvas, which jsdom lacks; stub the chart components so
 // chart-bearing screens render (and re-render on toggle) without a canvas.
 vi.mock('react-chartjs-2', () => ({ Line: () => null, Bar: () => null }));
+// Spy-wrap the db module (real implementations preserved) so individual calls
+// can be made to fail in the error-path tests.
+vi.mock('../src/db', { spy: true });
 import { Home } from '../src/screens/Home';
 import { Setup } from '../src/screens/Setup';
 import { PlayerStats } from '../src/screens/PlayerStats';
@@ -239,6 +242,54 @@ describe('screens render without crashing', () => {
     fireEvent.click(fillBtn);
     nowSpy.mockRestore();
     expect(container.querySelectorAll('.dart-slot.filled')).toHaveLength(3);
+  });
+
+  it('Live keeps the darts and shows an error when the turn save fails', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: 'm-savefail',
+        gameType: '501',
+        playerIds: [alice.id],
+        status: 'in_progress',
+        legs: [makeLeg('m-savefail', [])],
+      }),
+    );
+    const { container } = render(<Live matchId="m-savefail" />);
+    await screen.findByText('Alice');
+
+    fireEvent.click(screen.getByRole('button', { name: '20' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Miss Remaining (1/3)' }));
+
+    vi.mocked(saveMatch).mockRejectedValueOnce(new Error('quota exceeded'));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Turn (3/3)' }));
+
+    // The turn is not recorded, the darts stay in the slots, and an error shows.
+    await waitFor(() =>
+      expect(document.getElementById('toast')!.textContent).toContain('not recorded'),
+    );
+    expect(container.querySelectorAll('.dart-slot.filled')).toHaveLength(3);
+    expect((await getMatch('m-savefail'))!.legs[0].turns).toHaveLength(0);
+
+    // Retrying with the same darts records the turn.
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Turn (3/3)' }));
+    await waitFor(async () =>
+      expect((await getMatch('m-savefail'))!.legs[0].turns).toHaveLength(1),
+    );
+    errSpy.mockRestore();
+  });
+
+  it('Live surfaces a failed match load instead of a blank screen', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(getMatch).mockRejectedValueOnce(new Error('idb unavailable'));
+    render(<Live matchId="m-loadfail" />);
+
+    await waitFor(() =>
+      expect(document.getElementById('toast')!.textContent).toContain('Failed to load'),
+    );
+    expect(location.hash).toBe('#/');
+    errSpy.mockRestore();
   });
 
   it('LiveAtc ignores a double-tap on Confirm right after a turn is recorded', async () => {

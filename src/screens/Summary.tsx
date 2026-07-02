@@ -30,9 +30,16 @@ export function Summary({ matchId }: { matchId: string }) {
         return;
       }
       const players = await getPlayers();
+      if (!active) return;
       setNames(new Map(players.map((p: Player) => [p.id, p.name])));
       setMatch(m);
-    })();
+    })().catch((err) => {
+      // Without this a rejected read strands the user on a blank screen.
+      if (!active) return;
+      console.error(err);
+      toast('Failed to load the match', 'error');
+      navigate('/');
+    });
     return () => {
       active = false;
     };

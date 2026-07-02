@@ -20,7 +20,13 @@ export function Home() {
   const cancelRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
-  const refresh = () => getPlayers().then(setPlayers);
+  const refresh = () =>
+    getPlayers()
+      .then(setPlayers)
+      .catch((err) => {
+        console.error(err);
+        toast('Failed to load players', 'error');
+      });
   useEffect(() => {
     refresh();
   }, []);
@@ -64,7 +70,13 @@ export function Home() {
       toast('Enter a name first', 'error');
       return;
     }
-    await addPlayer(trimmed);
+    try {
+      await addPlayer(trimmed);
+    } catch (err) {
+      console.error(err);
+      toast('Could not save the player. Try again.', 'error');
+      return;
+    }
     setName('');
     await refresh();
     toast(`Added ${trimmed}`);
@@ -79,13 +91,26 @@ export function Home() {
     if (!pendingDelete) return;
     const { id, name } = pendingDelete;
     setPendingDelete(null);
-    await deletePlayer(id);
+    try {
+      await deletePlayer(id);
+    } catch (err) {
+      console.error(err);
+      toast('Delete failed — nothing was removed. Try again.', 'error');
+      return;
+    }
     await refresh();
     toast(`Deleted ${name} and their matches`);
   }
 
-  async function handleExport() {
-    const data = await exportAllData();
+  async function handleExport(): Promise<boolean> {
+    let data: ExportBundle;
+    try {
+      data = await exportAllData();
+    } catch (err) {
+      console.error(err);
+      toast('Export failed. Try again.', 'error');
+      return false;
+    }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -96,6 +121,7 @@ export function Home() {
     a.remove();
     URL.revokeObjectURL(url);
     toast('Backup downloaded');
+    return true;
   }
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -224,8 +250,7 @@ export function Home() {
               <button
                 className="btn"
                 onClick={async () => {
-                  await handleExport();
-                  setExportedBeforeDelete(true);
+                  if (await handleExport()) setExportedBeforeDelete(true);
                 }}
               >
                 {exportedBeforeDelete ? '✓ Backup saved' : '⬇ Export backup'}

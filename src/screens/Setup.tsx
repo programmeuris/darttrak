@@ -34,7 +34,12 @@ export function Setup() {
   const [ring, setRing] = useState<AtcRing>('single');
 
   useEffect(() => {
-    getPlayers().then(setPlayers);
+    getPlayers()
+      .then(setPlayers)
+      .catch((err) => {
+        console.error(err);
+        toast('Failed to load players', 'error');
+      });
   }, []);
 
   const isAtc = gameType === 'AroundTheClock';
@@ -69,7 +74,13 @@ export function Setup() {
       status: 'in_progress',
       legs: [{ id: uuid(), matchId, winnerId: null, turns: [] }],
     };
-    await saveMatch(match);
+    try {
+      await saveMatch(match);
+    } catch (err) {
+      console.error(err);
+      toast('Could not create the match. Try again.', 'error');
+      return;
+    }
     navigate(`/live/${matchId}`);
   }
 

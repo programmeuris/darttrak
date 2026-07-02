@@ -3,6 +3,7 @@ import 'chart.js/auto';
 import { Line, Bar } from 'react-chartjs-2';
 import type { ChartData, ChartDataset, ChartOptions, TooltipItem } from 'chart.js';
 import { navigate } from '../router';
+import { toast } from '../toast';
 import { Header, StatCell } from '../components/Header';
 import { getPlayers, getAllMatches } from '../db';
 import { computePlayerOverview, averagePerMatch, scoreDistribution } from '../stats';
@@ -195,11 +196,16 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
   const [tab, setTab] = useState<TabId>(() => (lockedId ? readStoredTab(lockedId) : 'overview'));
 
   useEffect(() => {
-    Promise.all([getPlayers(), getAllMatches()]).then(([ps, ms]) => {
-      setPlayers(ps);
-      setMatches(ms);
-      if (!lockedId && ps.length) setSelectedId(ps[0].id);
-    });
+    Promise.all([getPlayers(), getAllMatches()])
+      .then(([ps, ms]) => {
+        setPlayers(ps);
+        setMatches(ms);
+        if (!lockedId && ps.length) setSelectedId(ps[0].id);
+      })
+      .catch((err) => {
+        console.error(err);
+        toast('Failed to load stats', 'error');
+      });
   }, [lockedId]);
 
   const playerId = lockedId ?? selectedId;
