@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { navigate } from '../router';
 import { toast } from '../toast';
+import { readPref, writePref } from '../prefs';
 import { Header } from '../components/Header';
 import { getPlayers, saveMatch, uuid } from '../db';
 import type { GameType, Match, Player, AtcRing } from '../types';
@@ -25,13 +26,36 @@ const RINGS: { ring: AtcRing; label: string }[] = [
   { ring: 'progressive', label: 'Progressive' },
 ];
 
+// The last-used configuration is remembered on the device, so a rematch with
+// the usual settings is one tap. Each field is validated against the current
+// options — an unknown stored value falls back to the default.
+function storedSetup(): Partial<Pick<Match, 'gameType' | 'doubleOut' | 'atcRing'> & { legs: number }> {
+  try {
+    return JSON.parse(readPref('setup') ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
 export function Setup() {
+  const stored = storedSetup();
   const [players, setPlayers] = useState<Player[]>([]);
-  const [gameType, setGameType] = useState<GameType>('501');
+  const [gameType, setGameType] = useState<GameType>(() => {
+    const g = GAMES.find((x) => x.type === stored.gameType);
+    return g?.enabled ? g.type : '501';
+  });
   const [selected, setSelected] = useState<string[]>([]);
-  const [legs, setLegs] = useState(1);
-  const [doubleOut, setDoubleOut] = useState(true);
-  const [ring, setRing] = useState<AtcRing>('single');
+  const [legs, setLegs] = useState(() =>
+    FORMATS.some((f) => f.legs === stored.legs) ? stored.legs! : 1,
+  );
+  const [doubleOut, setDoubleOut] = useState(stored.doubleOut !== false);
+  const [ring, setRing] = useState<AtcRing>(() =>
+    RINGS.some((r) => r.ring === stored.atcRing) ? stored.atcRing! : 'single',
+  );
+
+  useEffect(() => {
+    writePref('setup', JSON.stringify({ gameType, legs, doubleOut, atcRing: ring }));
+  }, [gameType, legs, doubleOut, ring]);
 
   useEffect(() => {
     getPlayers()
