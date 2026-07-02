@@ -59,8 +59,14 @@ function atcVariantOpts(points: { label: string; cleared: boolean }[]): ChartOpt
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
     plugins: {
-      legend: { labels: { color: TEXT } },
+      // Dataset `order` flips the legend and tooltip listing along with the
+      // draw order, so both are pinned back to dataset order (Hit % first).
+      legend: {
+        labels: { color: TEXT, sort: (a, b) => (a.datasetIndex ?? 0) - (b.datasetIndex ?? 0) },
+      },
       tooltip: {
+        itemSort: (a: TooltipItem<'line'>, b: TooltipItem<'line'>) =>
+          a.datasetIndex - b.datasetIndex,
         callbacks: {
           title: (items: TooltipItem<'line'>[]) => points[items[0]?.dataIndex ?? 0]?.label ?? '',
           label: (ctx: TooltipItem<'line'>) => {
@@ -534,6 +540,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         tension: 0.25,
         pointRadius: 3,
         yAxisID: 'y',
+        order: 2,
       },
       {
         label: 'Darts / game',
@@ -548,6 +555,9 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         tension: 0.25,
         pointRadius: 3,
         yAxisID: 'yDarts',
+        // Lower order draws on top: the amber/red points stay visible where the
+        // two lines cross, instead of hiding under the Hit % points.
+        order: 1,
       },
     ],
   };
