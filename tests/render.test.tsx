@@ -426,6 +426,51 @@ describe('player profiles', () => {
     expect(screen.getByText('Average hit % per area, across the last 20 games.')).toBeTruthy();
   });
 
+  it('PlayerStats ATC offers a solo-only scope when solo and multiplayer games mix', async () => {
+    const alice = await addPlayer('Alice');
+    const bob = await addPlayer('Bob');
+    // A multiplayer game (Bob wins; Alice misses target 1) and a solo game
+    // (Alice hits target 1), both single-variant.
+    await saveMatch(
+      makeMatch({
+        id: 'atc-multi',
+        date: 1000,
+        gameType: 'AroundTheClock',
+        atcRing: 'single',
+        playerIds: [alice.id, bob.id],
+        status: 'completed',
+        winnerId: bob.id,
+        legs: [makeLeg('atc-multi', [makeTurn(alice.id, [atcMissDart(1)], 0)], bob.id)],
+      }),
+    );
+    await saveMatch(
+      makeMatch({
+        id: 'atc-solo',
+        date: 2000,
+        gameType: 'AroundTheClock',
+        atcRing: 'single',
+        playerIds: [alice.id],
+        status: 'completed',
+        winnerId: alice.id,
+        legs: [makeLeg('atc-solo', [makeTurn(alice.id, [atcHitDart(1)], 1)], alice.id)],
+      }),
+    );
+    render(<PlayerStats playerId={alice.id} />);
+    fireEvent.click(await screen.findByText('Around the Clock'));
+
+    // Both kinds exist, so the toggle shows; all games are in scope by default.
+    const solo = screen.getByRole('button', { name: 'Solo only (1)' });
+    expect(screen.getByRole('button', { name: 'All games (2)' }).className).toContain('active');
+    expect(screen.getByText('1/2')).toBeTruthy(); // target 1: hit in solo, missed in multi
+
+    // Solo only drops the multiplayer game from the chart and area table.
+    fireEvent.click(solo);
+    expect(solo.className).toContain('active');
+    expect(screen.getByText('Average hit % per area, across every solo game.')).toBeTruthy();
+    expect(screen.getByText('1/1')).toBeTruthy();
+    expect(screen.queryByText('1/2')).toBeNull();
+  });
+
   it('PlayerStats ATC area table sorts by area and hit %, both directions', async () => {
     const alice = await addPlayer('Alice');
     // One single-variant game whose targets have distinct hit rates so numeric
