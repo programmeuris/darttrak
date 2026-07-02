@@ -48,7 +48,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 /** Redirects via an effect (after commit) instead of mutating the hash during render. */
 function Redirect({ to }: { to: string }) {
   useEffect(() => {
-    navigate(to);
+    // Replace, don't push: the bad route must not stay in history where the
+    // Back button would land on it and re-trigger this redirect.
+    navigate(to, { replace: true });
   }, [to]);
   return null;
 }

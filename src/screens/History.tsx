@@ -122,7 +122,7 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
       if (!active) return;
       if (!m) {
         toast('Match not found', 'error');
-        navigate(backTo);
+        navigate(backTo, { replace: true });
         return;
       }
       const players = await getPlayers();
@@ -134,7 +134,7 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
       if (!active) return;
       console.error(err);
       toast('Failed to load the match', 'error');
-      navigate(backTo);
+      navigate(backTo, { replace: true });
     });
     return () => {
       active = false;

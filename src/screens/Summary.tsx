@@ -26,7 +26,7 @@ export function Summary({ matchId }: { matchId: string }) {
       if (!active) return;
       if (!m) {
         toast('Match not found', 'error');
-        navigate('/');
+        navigate('/', { replace: true });
         return;
       }
       const players = await getPlayers();
@@ -38,7 +38,7 @@ export function Summary({ matchId }: { matchId: string }) {
       if (!active) return;
       console.error(err);
       toast('Failed to load the match', 'error');
-      navigate('/');
+      navigate('/', { replace: true });
     });
     return () => {
       active = false;
