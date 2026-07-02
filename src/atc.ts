@@ -252,6 +252,10 @@ export interface AtcMatchPoint {
   hitRate: number;
   darts: number; // total darts the player threw that game
   avgDartsToClear: number;
+  // Whether the player cleared the board in at least one leg. When false (a
+  // competitive loss) the game ended before they finished, so `darts` is a
+  // truncated count rather than a real throws-to-finish figure.
+  cleared: boolean;
 }
 
 /** Per-match hit rate and darts-to-clear over time (for trend charts). */
@@ -270,13 +274,14 @@ export function atcPerMatch(matches: Match[], playerId: string): AtcMatchPoint[]
       avgDartsToClear: wonLegDarts.length
         ? wonLegDarts.reduce((a, b) => a + b, 0) / wonLegDarts.length
         : 0,
+      cleared: m.legs.some((l) => l.winnerId === playerId),
     };
   });
 }
 
 export interface AtcVariantSeries {
   ring: AtcRing;
-  points: { date: number; label: string; hitRate: number; darts: number }[]; // oldest → newest
+  points: { date: number; label: string; hitRate: number; darts: number; cleared: boolean }[]; // oldest → newest
 }
 
 /**
@@ -291,7 +296,13 @@ export function atcSeriesByVariant(matches: Match[], playerId: string): AtcVaria
   for (const ring of ATC_RING_ORDER) {
     const pts = points
       .filter((p) => p.ring === ring)
-      .map((p) => ({ date: p.date, label: p.label, hitRate: p.hitRate, darts: p.darts }));
+      .map((p) => ({
+        date: p.date,
+        label: p.label,
+        hitRate: p.hitRate,
+        darts: p.darts,
+        cleared: p.cleared,
+      }));
     if (pts.length) out.push({ ring, points: pts });
   }
   return out;
