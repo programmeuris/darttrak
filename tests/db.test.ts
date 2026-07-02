@@ -8,6 +8,7 @@ import {
   deletePlayer,
   importAllData,
   exportAllData,
+  EXPORT_VERSION,
 } from '../src/db';
 import { makeMatch, makeLeg } from './helpers';
 
@@ -36,29 +37,63 @@ describe('deletePlayer cascade', () => {
 });
 
 describe('importAllData validation', () => {
-  it('drops malformed records instead of persisting data that crashes screens', async () => {
+  // Import replaces the whole DB, so a bundle with ANY invalid record is
+  // rejected outright — importing the wrong file must never wipe real data.
+  it('rejects a bundle containing malformed records and leaves existing data untouched', async () => {
+    const keep = await addPlayer('Keep');
     const bundle = {
       players: [
         { id: 'p1', name: 'Valid', createdAt: 0 },
         { name: 'No id' }, // invalid: missing id
-        null, // invalid
       ],
       matches: [
         makeMatch({ id: 'good', gameType: '501', playerIds: ['p1'], legs: [makeLeg('good', [])] }),
-        { id: 'bad-no-legs', playerIds: ['p1'] }, // invalid: missing legs
-        { id: 'bad-no-players', legs: [] }, // invalid: missing playerIds
       ],
     } as unknown as Parameters<typeof importAllData>[0];
 
-    await expect(importAllData(bundle)).resolves.toBeUndefined(); // does not throw
+    await expect(importAllData(bundle)).rejects.toThrow(/invalid record/);
 
-    expect((await getPlayers()).map((p) => p.id)).toEqual(['p1']);
-    expect((await getAllMatches()).map((m) => m.id)).toEqual(['good']);
+    // Nothing was cleared or written — the valid records were not kept either.
+    expect((await getPlayers()).map((p) => p.id)).toEqual([keep.id]);
+    expect(await getAllMatches()).toEqual([]);
   });
 
-  it('round-trips a valid export', async () => {
+  it('rejects matches that would crash screens after import', async () => {
+    const valid = () =>
+      makeMatch({ id: 'v', gameType: '501', playerIds: ['p1'], legs: [makeLeg('v', [])] });
+    const broken = [
+      { ...valid(), format: undefined }, // History/Live read format.legs
+      { ...valid(), playerIds: [] }, // turn rotation divides by player count
+      { ...valid(), legs: [] }, // resuming reads the active leg
+      { ...valid(), legs: [{}] }, // every stats module iterates leg.turns
+      { ...valid(), status: 'bogus' }, // list would offer Resume on garbage
+      { ...valid(), date: undefined }, // match ordering sorts by date
+    ];
+    for (const m of broken) {
+      const bundle = { players: [], matches: [m] } as unknown as Parameters<
+        typeof importAllData
+      >[0];
+      await expect(importAllData(bundle)).rejects.toThrow(/invalid record/);
+    }
+  });
+
+  it('rejects backups from a newer app version and accepts legacy unversioned ones', async () => {
+    await expect(
+      importAllData({ version: EXPORT_VERSION + 1, players: [], matches: [] }),
+    ).rejects.toThrow(/newer version/);
+
+    // Backups made before versioning have no marker and import as v1.
+    await importAllData({
+      players: [{ id: 'p-old', name: 'Old', createdAt: 0 }],
+      matches: [],
+    });
+    expect((await getPlayers()).map((p) => p.name)).toEqual(['Old']);
+  });
+
+  it('round-trips a valid export, stamped with the current version', async () => {
     await addPlayer('Alice');
     const exported = await exportAllData();
+    expect(exported.version).toBe(EXPORT_VERSION);
     await importAllData({ players: [], matches: [] });
     await importAllData(exported);
     expect((await getPlayers()).map((p) => p.name)).toEqual(['Alice']);

@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Player, Match, ExportBundle } from './types';
+import type { Player, Match, Leg, ExportBundle } from './types';
 
 interface DartsDB extends DBSchema {
   players: {
@@ -112,16 +112,24 @@ export async function deleteMatch(id: string): Promise<void> {
 
 // ---- Export / Import ----
 
+/** Bump when the stored record shape changes, so imports can tell old
+ * backups (migrate) from newer-app backups (reject) instead of silently
+ * dropping records whose shape no longer validates. */
+export const EXPORT_VERSION = 1;
+
 export async function exportAllData(): Promise<ExportBundle> {
   const db = await getDB();
   const players = await db.getAll('players');
   const matches = await db.getAll('matches');
-  return { players, matches };
+  return { version: EXPORT_VERSION, players, matches };
 }
 
-// Minimal shape guards — this is a local-only DB, so the goal is just to keep a
-// malformed backup from persisting records that crash screens later (missing
-// id / playerIds / legs), not to fully validate every field.
+// Shape guards for imported records. Import replaces the whole DB, so an
+// invalid record means a corrupt or wrong file and the import is rejected
+// outright — the data currently in the DB is the user's only other copy.
+// The match guard covers every field a screen dereferences unconditionally
+// (format.legs, leg.turns, dart lists, playerIds rotation), so a bad record
+// can't persist and then crash History/Live/Stats on every visit.
 function isValidPlayer(p: unknown): p is Player {
   return (
     typeof p === 'object' &&
@@ -130,19 +138,60 @@ function isValidPlayer(p: unknown): p is Player {
     typeof (p as Player).name === 'string'
   );
 }
-function isValidMatch(m: unknown): m is Match {
+function isValidLeg(l: unknown): l is Leg {
+  if (typeof l !== 'object' || l === null) return false;
+  const leg = l as Leg;
   return (
-    typeof m === 'object' &&
-    m !== null &&
-    typeof (m as Match).id === 'string' &&
-    Array.isArray((m as Match).playerIds) &&
-    Array.isArray((m as Match).legs)
+    Array.isArray(leg.turns) &&
+    leg.turns.every(
+      (t) =>
+        typeof t === 'object' &&
+        t !== null &&
+        typeof t.playerId === 'string' &&
+        Array.isArray(t.darts),
+    )
+  );
+}
+function isValidMatch(m: unknown): m is Match {
+  if (typeof m !== 'object' || m === null) return false;
+  const match = m as Match;
+  return (
+    typeof match.id === 'string' &&
+    typeof match.date === 'number' &&
+    (match.status === 'completed' || match.status === 'in_progress') &&
+    typeof match.format === 'object' &&
+    match.format !== null &&
+    typeof match.format.legs === 'number' &&
+    Array.isArray(match.playerIds) &&
+    match.playerIds.length >= 1 &&
+    match.playerIds.every((id) => typeof id === 'string') &&
+    Array.isArray(match.legs) &&
+    match.legs.length >= 1 &&
+    match.legs.every(isValidLeg)
   );
 }
 
+/**
+ * Replace the entire DB with the bundle's contents. All-or-nothing: the
+ * bundle is fully validated before anything is touched, and the clear +
+ * writes share one transaction — a failed import never leaves partial data.
+ * Throws (with a user-facing message) on unsupported versions or invalid
+ * records; existing data is untouched in that case.
+ */
 export async function importAllData(data: ExportBundle): Promise<void> {
-  const players = (data.players ?? []).filter(isValidPlayer);
-  const matches = (data.matches ?? []).filter(isValidMatch);
+  const version = data.version ?? EXPORT_VERSION; // pre-versioning backups = v1
+  if (typeof version !== 'number' || version > EXPORT_VERSION) {
+    throw new Error('this backup was made by a newer version of DartTrak');
+  }
+  const players = data.players ?? [];
+  const matches = data.matches ?? [];
+  const badPlayers = players.filter((p) => !isValidPlayer(p)).length;
+  const badMatches = matches.filter((m) => !isValidMatch(m)).length;
+  if (badPlayers > 0 || badMatches > 0) {
+    throw new Error(
+      `the file contains ${badPlayers + badMatches} invalid record(s) — nothing was imported`,
+    );
+  }
   const db = await getDB();
   const tx = db.transaction(['players', 'matches'], 'readwrite');
   // Overwrite existing data
