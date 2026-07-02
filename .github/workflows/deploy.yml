@@ -23,9 +23,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Keep in sync with ci.yml so deploy builds what CI validated.
+          node-version: 22
           cache: npm
       - run: npm ci
+      # Gate the deploy on the test suite: ci.yml runs on the same push but in a
+      # parallel race, so without this a red main would still go live.
+      - run: npm test
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
