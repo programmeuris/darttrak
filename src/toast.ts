@@ -8,6 +8,9 @@ export function toast(message: string, kind: 'info' | 'error' = 'info'): void {
     node = document.createElement('div');
     node.id = 'toast';
     node.className = 'toast';
+    // Polite live region so screen readers announce toasts — without it,
+    // feedback like "Bust!" or "Select at least one player" is visual-only.
+    node.setAttribute('role', 'status');
     document.body.append(node);
   }
   node.textContent = message;

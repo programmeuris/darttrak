@@ -54,6 +54,24 @@ describe('screens render without crashing', () => {
     await waitFor(() => expect(screen.getByText('No players yet. Add one below.')).toBeTruthy());
   });
 
+  it('Home delete modal moves focus to Cancel and closes on Escape', async () => {
+    await addPlayer('Alice');
+    render(<Home />);
+    const trigger = await screen.findByLabelText('Delete Alice');
+    trigger.focus(); // jsdom doesn't focus on click; real browsers do
+    fireEvent.click(trigger);
+
+    // Focus lands on Cancel — the safe default in a destructive dialog.
+    const cancel = screen.getByText('Cancel');
+    expect(document.activeElement).toBe(cancel);
+
+    // Escape dismisses without deleting and returns focus to the trigger.
+    fireEvent.keyDown(cancel, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByLabelText("Open Alice's profile")).toBeTruthy();
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it('Setup renders game-type options and shows the ATC ring picker', async () => {
     render(<Setup />);
     expect(screen.getByText('Game Type')).toBeTruthy();
@@ -157,6 +175,33 @@ describe('screens render without crashing', () => {
       expect(saved!.status).toBe('completed');
       expect(saved!.winnerId).toBe(bob.id);
     });
+  });
+
+  it('Live multiplier buttons expose their armed state via aria-pressed', async () => {
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: 'm-mult',
+        gameType: '501',
+        playerIds: [alice.id],
+        status: 'in_progress',
+        legs: [makeLeg('m-mult', [])],
+      }),
+    );
+    render(<Live matchId="m-mult" />);
+
+    const single = await screen.findByRole('button', { name: 'Single' });
+    const dbl = screen.getByRole('button', { name: 'Double' });
+    expect(single.getAttribute('aria-pressed')).toBe('true');
+    expect(dbl.getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(dbl);
+    expect(dbl.getAttribute('aria-pressed')).toBe('true');
+    expect(single.getAttribute('aria-pressed')).toBe('false');
+
+    // Registering a dart re-arms Single, and the state says so.
+    fireEvent.click(screen.getByRole('button', { name: '20' }));
+    expect(single.getAttribute('aria-pressed')).toBe('true');
   });
 
   it('LiveAtc fills the remaining darts as misses, then confirms on the next press', async () => {

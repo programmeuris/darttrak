@@ -16,11 +16,47 @@ export function Home() {
   const [pendingDelete, setPendingDelete] = useState<Player | null>(null);
   const [exportedBeforeDelete, setExportedBeforeDelete] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   const refresh = () => getPlayers().then(setPlayers);
   useEffect(() => {
     refresh();
   }, []);
+
+  // aria-modal hides the rest of the page from assistive tech, so focus must
+  // move into the dialog while it's open and back to the trigger on close.
+  // Cancel gets initial focus — the safe default for a destructive dialog.
+  useEffect(() => {
+    if (pendingDelete) {
+      restoreFocusRef.current = document.activeElement as HTMLElement | null;
+      cancelRef.current?.focus();
+    } else {
+      restoreFocusRef.current?.focus();
+      restoreFocusRef.current = null;
+    }
+  }, [pendingDelete]);
+
+  function onModalKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Escape') {
+      setPendingDelete(null);
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    // Keep Tab cycling inside the dialog (its only focusables are buttons).
+    const focusables = modalRef.current?.querySelectorAll<HTMLButtonElement>('button');
+    if (!focusables?.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 
   async function handleAdd() {
     const trimmed = name.trim();
@@ -172,10 +208,14 @@ export function Home() {
           className="modal-overlay"
           role="dialog"
           aria-modal="true"
+          aria-labelledby="delete-modal-title"
           onClick={() => setPendingDelete(null)}
+          onKeyDown={onModalKeyDown}
         >
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="card-title">Delete “{pendingDelete.name}”?</h2>
+          <div className="modal" ref={modalRef} onClick={(e) => e.stopPropagation()}>
+            <h2 className="card-title" id="delete-modal-title">
+              Delete “{pendingDelete.name}”?
+            </h2>
             <p className="muted">
               This permanently removes {pendingDelete.name} and every match they played — it
               can’t be undone. Export a backup first if you might want this data back.
@@ -190,7 +230,7 @@ export function Home() {
               >
                 {exportedBeforeDelete ? '✓ Backup saved' : '⬇ Export backup'}
               </button>
-              <button className="btn" onClick={() => setPendingDelete(null)}>
+              <button className="btn" ref={cancelRef} onClick={() => setPendingDelete(null)}>
                 Cancel
               </button>
               <button className="btn danger" onClick={confirmDelete}>
