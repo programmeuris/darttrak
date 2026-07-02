@@ -43,7 +43,10 @@ Two reasons:
   Solo-only toggle scopes the chart and area table to just the games you entered
   yourself; once more than 20 games are in scope, an All / Last-20 toggle narrows
   them further. Each player's last-viewed tab is remembered.
-- **Backup & restore**: export all data to JSON and re-import it (your only backup)
+- **Backup & restore**: export all data to JSON and re-import it (your only
+  backup). Imports are validated up front and rejected whole if the file is
+  corrupt or from a newer app version — importing the wrong file can't wipe
+  your data.
 - **Installable PWA** — works offline once loaded; "Add to Home Screen" on
   Chrome / Safari
 

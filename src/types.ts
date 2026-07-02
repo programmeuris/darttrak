@@ -56,6 +56,9 @@ export interface Match {
 
 /** Bundle returned by export / accepted by import. */
 export interface ExportBundle {
+  // Schema version of the bundle. Absent on backups made before versioning
+  // was introduced — those are treated as version 1.
+  version?: number;
   players: Player[];
   matches: Match[];
 }
