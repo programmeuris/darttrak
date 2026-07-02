@@ -245,64 +245,41 @@ export function atcTargetStats(
   });
 }
 
-export interface AtcMatchPoint {
-  date: number;
-  label: string;
-  ring: AtcRing;
-  hitRate: number;
-  darts: number; // total darts the player threw that game
-  avgDartsToClear: number;
-  // Whether the player cleared the board in at least one leg. When false (a
-  // competitive loss) the game ended before they finished, so `darts` is a
-  // truncated count rather than a real throws-to-finish figure.
-  cleared: boolean;
-}
-
-/** Per-match hit rate and darts-to-clear over time (for trend charts). */
-export function atcPerMatch(matches: Match[], playerId: string): AtcMatchPoint[] {
-  return atcMatchesFor(matches, playerId).map((m) => {
-    const wonLegDarts = m.legs
-      .filter((l) => l.winnerId === playerId)
-      .map((l) => playerDartsInLeg(l, playerId))
-      .filter((d) => d > 0);
-    return {
-      date: m.date,
-      label: new Date(m.date).toLocaleDateString(),
-      ring: ringOf(m),
-      hitRate: atcHitRate(m.legs, playerId),
-      darts: atcDartsThrown(m.legs, playerId),
-      avgDartsToClear: wonLegDarts.length
-        ? wonLegDarts.reduce((a, b) => a + b, 0) / wonLegDarts.length
-        : 0,
-      cleared: m.legs.some((l) => l.winnerId === playerId),
-    };
-  });
-}
-
 export interface AtcVariantSeries {
   ring: AtcRing;
-  points: { date: number; label: string; hitRate: number; darts: number; cleared: boolean }[]; // oldest → newest
+  // One point per LEG the player threw in, oldest match first with legs in
+  // play order. The leg is the unit here because "darts to finish" only means
+  // something per attempt at the board — pooling a best-of-3 match would make
+  // the number depend on the format, not the throwing. `cleared` is per leg:
+  // false when the leg ended (opponent finished) before the player cleared,
+  // i.e. `darts` is a truncated count rather than a real throws-to-finish.
+  points: { date: number; label: string; hitRate: number; darts: number; cleared: boolean }[];
 }
 
 /**
- * Per-game series split by variant, each indexed by its own game count rather
- * than a shared date axis. This lets the chart align every variant at game 1
+ * Per-leg series split by variant, each indexed by its own leg count rather
+ * than a shared date axis. This lets the chart align every variant at leg 1
  * (instead of interleaving them by date, which collides on same-day games).
  * Returned in ring order; rings with no games are omitted.
  */
 export function atcSeriesByVariant(matches: Match[], playerId: string): AtcVariantSeries[] {
-  const points = atcPerMatch(matches, playerId);
   const out: AtcVariantSeries[] = [];
   for (const ring of ATC_RING_ORDER) {
-    const pts = points
-      .filter((p) => p.ring === ring)
-      .map((p) => ({
-        date: p.date,
-        label: p.label,
-        hitRate: p.hitRate,
-        darts: p.darts,
-        cleared: p.cleared,
-      }));
+    const pts: AtcVariantSeries['points'] = [];
+    for (const m of atcVariantMatches(matches, playerId, ring)) {
+      const dateLabel = new Date(m.date).toLocaleDateString();
+      m.legs.forEach((leg, i) => {
+        const darts = playerDartsInLeg(leg, playerId);
+        if (darts === 0) return; // a leg the player never threw in isn't an attempt
+        pts.push({
+          date: m.date,
+          label: m.legs.length > 1 ? `${dateLabel} · Leg ${i + 1}` : dateLabel,
+          hitRate: atcHitRate([leg], playerId),
+          darts,
+          cleared: leg.winnerId === playerId,
+        });
+      });
+    }
     if (pts.length) out.push({ ring, points: pts });
   }
   return out;

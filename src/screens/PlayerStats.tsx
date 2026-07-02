@@ -99,7 +99,7 @@ function atcVariantOpts(points: { label: string; cleared: boolean }[]): ChartOpt
         position: 'right',
         ticks: { color: TEXT },
         grid: { drawOnChartArea: false },
-        title: { display: true, text: 'Darts / game', color: TEXT },
+        title: { display: true, text: 'Darts / leg', color: TEXT },
       },
     },
   };
@@ -553,7 +553,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         ? 'every solo game'
         : 'every game';
   const chartData: ChartData<'line'> = {
-    labels: points.map((_, i) => `Game ${i + 1}`),
+    labels: points.map((_, i) => `Leg ${i + 1}`),
     datasets: [
       {
         label: 'Hit %',
@@ -566,7 +566,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         order: 2,
       },
       {
-        label: 'Darts / game',
+        label: 'Darts / leg',
         data: points.map((p) => p.darts),
         borderColor: AMBER,
         backgroundColor: AMBER,
@@ -659,9 +659,9 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         {points.length > 0 && (
           <>
             <p className="muted">
-              Hit % and throws to finish, per game.
+              Hit % and throws to finish, per leg.
               {points.some((p) => !p.cleared) &&
-                ' Red points mark games where the board wasn’t cleared.'}
+                ' Red points mark legs where the board wasn’t cleared.'}
             </p>
             <div className="chart-wrap">
               <Line data={chartData} options={atcVariantOpts(points)} />
