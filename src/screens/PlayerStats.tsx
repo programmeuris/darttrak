@@ -258,6 +258,7 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
           <button
             key={m.id}
             className={`tab ${mode === m.id ? 'active' : ''}`}
+            aria-pressed={mode === m.id}
             onClick={() => selectMode(m.id)}
           >
             {m.label}
@@ -270,6 +271,7 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
             <button
               key={t.id}
               className={`tab ${t.id === tab ? 'active' : ''}`}
+              aria-pressed={t.id === tab}
               onClick={() => selectTab(t.id)}
             >
               {t.label}
@@ -570,6 +572,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             <button
               key={v.ring}
               className={`chip ${v.ring === active.ring ? 'active' : ''}`}
+              aria-pressed={v.ring === active.ring}
               onClick={() => setActiveRing(v.ring)}
             >
               {atcRingLabel(v.ring)}
@@ -595,12 +598,14 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
           <div className="chip-row scope-row">
             <button
               className={`chip ${soloOnly ? '' : 'active'}`}
+              aria-pressed={!soloOnly}
               onClick={() => setSoloOnly(false)}
             >
               All games ({variantMatches.length})
             </button>
             <button
               className={`chip ${soloOnly ? 'active' : ''}`}
+              aria-pressed={soloOnly}
               onClick={() => setSoloOnly(true)}
             >
               Solo only ({soloMatches.length})
@@ -611,12 +616,14 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
           <div className="chip-row scope-row">
             <button
               className={`chip ${recentOnly ? '' : 'active'}`}
+              aria-pressed={!recentOnly}
               onClick={() => setRecentOnly(false)}
             >
               All ({totalGames})
             </button>
             <button
               className={`chip ${recentOnly ? 'active' : ''}`}
+              aria-pressed={recentOnly}
               onClick={() => setRecentOnly(true)}
             >
               Last {ATC_RECENT_WINDOW} games

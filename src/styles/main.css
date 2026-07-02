@@ -3,10 +3,20 @@
   --surface: #16213e;
   --surface-2: #1f2a4d;
   --accent: #e94560;
+  /* WCAG AA variants: -strong darkens for solid fills under white text
+     (≥4.5:1 vs #fff); -text lightens for small coloured text on any surface
+     (≥4.5:1 vs --surface-2, the lightest background). --accent stays for
+     borders, glows, and large text (≥3:1 everywhere). */
+  --accent-strong: #e52343;
+  --accent-text: #ed657b;
   --text: #eaeaea;
   --muted: #9aa3b8;
   --success: #0f9b58;
+  --success-strong: #0d884d;
+  --success-text: #10a85f;
   --danger: #e94560;
+  --danger-strong: var(--accent-strong);
+  --danger-text: var(--accent-text);
   --radius: 14px;
   --tap: 56px;
 }
@@ -14,6 +24,16 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Kill the double-tap-to-zoom delay on controls without blocking pinch-zoom
+   (replaces the old user-scalable=no viewport lock, which failed WCAG 1.4.4). */
+button,
+input,
+select,
+label,
+a {
+  touch-action: manipulation;
 }
 
 html,
@@ -90,11 +110,11 @@ body {
   cursor: not-allowed;
 }
 .btn.primary {
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
 }
 .btn.success {
-  background: var(--success);
+  background: var(--success-strong);
   color: #fff;
 }
 /* When a leg/match is won the throw is recorded but not finalized until the
@@ -119,7 +139,7 @@ body {
   }
 }
 .btn.danger {
-  background: var(--danger);
+  background: var(--danger-strong);
   color: #fff;
 }
 .btn.ghost {
@@ -152,7 +172,7 @@ body {
 }
 .icon-btn.danger {
   background: transparent;
-  color: var(--danger);
+  color: var(--danger-text);
   width: 40px;
   height: 40px;
   min-width: 40px;
@@ -292,8 +312,8 @@ body {
   cursor: pointer;
 }
 .chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
   color: #fff;
 }
 .chip:disabled {
@@ -335,7 +355,7 @@ body {
   height: 20px;
   padding: 0 6px;
   border-radius: 10px;
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
   font-size: 0.8rem;
   font-weight: 700;
@@ -434,7 +454,7 @@ body {
   padding: 8px 12px;
 }
 .checkout-hint strong {
-  color: var(--success);
+  color: var(--success-text);
   font-size: 1.05rem;
   letter-spacing: 0.3px;
 }
@@ -463,14 +483,14 @@ body {
 }
 .dart-slot.hit {
   border-color: var(--success);
-  color: var(--success);
+  color: var(--success-text);
 }
 .dart-slot.miss {
   border-color: var(--muted);
   color: var(--muted);
 }
 .hit-btn {
-  background: var(--success);
+  background: var(--success-strong);
   color: #fff;
   min-height: 64px;
   font-size: 1.2rem;
@@ -492,12 +512,12 @@ body {
 }
 .banner.bust {
   background: rgba(233, 69, 96, 0.2);
-  color: var(--accent);
+  color: var(--accent-text);
   border: 1px solid var(--accent);
 }
 .banner.win {
   background: rgba(15, 155, 88, 0.2);
-  color: var(--success);
+  color: var(--success-text);
   border: 1px solid var(--success);
 }
 
@@ -557,8 +577,8 @@ body {
   cursor: pointer;
 }
 .mult-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
   color: #fff;
 }
 .num-grid {
@@ -579,7 +599,7 @@ body {
 }
 .num-btn:active {
   transform: scale(0.95);
-  background: var(--accent);
+  background: var(--accent-strong);
 }
 .num-btn:disabled {
   opacity: 0.35;
@@ -641,7 +661,7 @@ body {
   text-align: right;
 }
 .log-leg {
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.75rem;
 }
 
@@ -688,7 +708,7 @@ body {
   border: 1px solid var(--success);
 }
 .badge {
-  color: var(--success);
+  color: var(--success-text);
   font-size: 0.85rem;
 }
 
@@ -731,7 +751,7 @@ body {
 }
 .match-game {
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .match-date {
   color: var(--muted);
@@ -807,8 +827,8 @@ body {
   flex: 0 0 auto;
 }
 .tab.active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
   color: #fff;
 }
 /* Stats content sits below the tab bars; space its cards (and the ATC variant
@@ -873,11 +893,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .h2h-table .good {
-  color: var(--success);
+  color: var(--success-text);
   font-weight: 700;
 }
 .h2h-table .bad {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 
@@ -974,7 +994,7 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 .toast.error {
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
 }
 

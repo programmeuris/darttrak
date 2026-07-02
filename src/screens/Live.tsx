@@ -283,6 +283,7 @@ export function Live({ matchId }: { matchId: string }) {
             <button
               key={v}
               className={`mult-btn ${v === multiplier ? 'active' : ''}`}
+              aria-pressed={v === multiplier}
               onClick={() => setMultiplier(v)}
             >
               {label}

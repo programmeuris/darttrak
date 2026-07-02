@@ -84,6 +84,7 @@ export function Setup() {
             <button
               key={g.type}
               className={`chip ${g.type === gameType ? 'active' : ''}`}
+              aria-pressed={g.type === gameType}
               disabled={!g.enabled}
               title={g.enabled ? '' : 'Coming soon'}
               onClick={() => setGameType(g.type)}
@@ -129,6 +130,7 @@ export function Setup() {
             <button
               key={f.legs}
               className={`chip ${f.legs === legs ? 'active' : ''}`}
+              aria-pressed={f.legs === legs}
               onClick={() => setLegs(f.legs)}
             >
               {f.label}
@@ -162,6 +164,7 @@ export function Setup() {
               <button
                 key={r.ring}
                 className={`chip ${r.ring === ring ? 'active' : ''}`}
+                aria-pressed={r.ring === ring}
                 onClick={() => setRing(r.ring)}
               >
                 {r.label}
