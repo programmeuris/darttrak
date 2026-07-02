@@ -454,7 +454,7 @@ function Scoring({ matches, playerId }: { matches: Match[]; playerId: string }) 
             [String(s.over180), '180s'],
           ]}
         />
-        <p className="muted">Ton+ rate = share of scoring visits worth 100 or more.</p>
+        <p className="muted">Ton+ rate = share of visits worth 100 or more (busts excluded).</p>
       </section>
       <ChartCard title="3-Dart vs First-9 Average" subtitle="First-9 is the pure scoring phase before finishing.">
         <Line data={data} options={lineOpts} />

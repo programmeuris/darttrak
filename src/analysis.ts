@@ -1,5 +1,11 @@
 import type { Match, Leg, Turn } from './types';
-import { calculateAverage, checkoutCap, isX01 } from './scoring';
+import {
+  calculateAverage,
+  calculateHighestTurn,
+  checkoutCap,
+  countHighScores,
+  isX01,
+} from './scoring';
 
 // ---- shared helpers ----
 
@@ -61,7 +67,12 @@ function startRemaining(turn: Turn): number {
   return turn.remainingScore + scoredPoints(turn);
 }
 
-/** Full scoring visits: not a bust, all three darts thrown (excludes finishes). */
+/**
+ * Full scoring visits: not a bust, all three darts thrown. Excludes short
+ * (1–2 dart) finishing visits, whose totals aren't comparable to full visits —
+ * use this for averages/spread, NOT for counting stats like 100+ (a 2-dart
+ * 110 checkout is a real ton-plus visit; see countHighScores in scoring.ts).
+ */
 function scoringVisits(turns: Turn[]): number[] {
   return turns
     .filter((t) => !t.isBust && t.darts.length === 3)
@@ -226,8 +237,10 @@ export function finishingStats(
 export interface ScoringStats {
   threeDartAverage: number;
   firstNineAverage: number; // scoring phase: first 3 visits of each leg
-  tonPlusRate: number; // % of scoring visits >= 100
+  tonPlusRate: number; // % of non-bust visits >= 100
   highestVisit: number;
+  // Counted over every non-bust visit — the same definition the match
+  // Summary uses (countHighScores), so the two screens always agree.
   over100: number;
   over140: number;
   over180: number;
@@ -251,20 +264,10 @@ function firstNineAverage(legs: Leg[], playerId: string): number {
 export function scoringStats(matches: Match[], playerId: string): ScoringStats {
   const played = playerMatches(matches, playerId);
   const legs = legsOf(played);
-  const visits = scoringVisits(turnsForPlayer(legs, playerId));
-
-  let over100 = 0;
-  let over140 = 0;
-  let over180 = 0;
-  let tonPlus = 0;
-  for (const v of visits) {
-    if (v >= 100) {
-      over100++;
-      tonPlus++;
-    }
-    if (v >= 140) over140++;
-    if (v >= 180) over180++;
-  }
+  // Shared definitions with the match Summary: every non-bust visit counts,
+  // including 1–2 dart checkouts (a 2-dart 110 finish is a real ton-plus).
+  const { over100, over140, over180 } = countHighScores(legs, playerId);
+  const nonBustVisits = turnsForPlayer(legs, playerId).filter((t) => !t.isBust).length;
 
   const perMatch = played.map((m) => ({
     label: dateLabel(m.date),
@@ -276,8 +279,8 @@ export function scoringStats(matches: Match[], playerId: string): ScoringStats {
   return {
     threeDartAverage: calculateAverage(legs, playerId),
     firstNineAverage: firstNineAverage(legs, playerId),
-    tonPlusRate: visits.length === 0 ? 0 : (tonPlus / visits.length) * 100,
-    highestVisit: visits.length ? Math.max(...visits) : 0,
+    tonPlusRate: nonBustVisits === 0 ? 0 : (over100 / nonBustVisits) * 100,
+    highestVisit: calculateHighestTurn(legs, playerId),
     over100,
     over140,
     over180,
