@@ -53,7 +53,7 @@ const barOpts: ChartOptions<'bar'> = {
 
 // Per-variant ATC chart: Hit % on the left axis (0–100), throws-to-finish on the
 // right axis (auto-scaled), so both trends read off one graph.
-function atcVariantOpts(points: { label: string }[]): ChartOptions<'line'> {
+function atcVariantOpts(points: { label: string; cleared: boolean }[]): ChartOptions<'line'> {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -63,8 +63,14 @@ function atcVariantOpts(points: { label: string }[]): ChartOptions<'line'> {
       tooltip: {
         callbacks: {
           title: (items: TooltipItem<'line'>[]) => points[items[0]?.dataIndex ?? 0]?.label ?? '',
-          label: (ctx: TooltipItem<'line'>) =>
-            `${ctx.dataset.label}: ${ctx.parsed.y}${ctx.dataset.yAxisID === 'yDarts' ? ' darts' : '%'}`,
+          label: (ctx: TooltipItem<'line'>) => {
+            const isDarts = ctx.dataset.yAxisID === 'yDarts';
+            // An uncleared game ended before the player finished the board, so
+            // its darts count is truncated — flag it rather than let it read as
+            // a genuinely quick game.
+            const suffix = isDarts && !points[ctx.dataIndex]?.cleared ? ' (unfinished)' : '';
+            return `${ctx.dataset.label}: ${ctx.parsed.y}${isDarts ? ' darts' : '%'}${suffix}`;
+          },
         },
       },
     },
@@ -519,6 +525,10 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         data: points.map((p) => p.darts),
         borderColor: AMBER,
         backgroundColor: AMBER,
+        // Games the player didn't clear get a red point: the game ended early,
+        // so their darts count isn't a real throws-to-finish figure.
+        pointBackgroundColor: points.map((p) => (p.cleared ? AMBER : ACCENT)),
+        pointBorderColor: points.map((p) => (p.cleared ? AMBER : ACCENT)),
         borderDash: [5, 4],
         tension: 0.25,
         pointRadius: 3,
@@ -574,7 +584,11 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         )}
         {points.length > 0 && (
           <>
-            <p className="muted">Hit % and throws to finish, per game.</p>
+            <p className="muted">
+              Hit % and throws to finish, per game.
+              {points.some((p) => !p.cleared) &&
+                ' Red points mark games where the board wasn’t cleared.'}
+            </p>
             <div className="chart-wrap">
               <Line data={chartData} options={atcVariantOpts(points)} />
             </div>

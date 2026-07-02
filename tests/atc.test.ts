@@ -219,6 +219,8 @@ describe('analytics by variant', () => {
     const points = atcPerMatch([m3, m1, m2], A);
     expect(points.map((p) => p.date)).toEqual([1000, 2000, 3000]);
     expect(points.map((p) => p.ring)).toEqual(['single', 'progressive', 'double']);
+    // A cleared m1 and m2 but lost m3 (B cleared it), so m3 is uncleared.
+    expect(points.map((p) => p.cleared)).toEqual([true, true, false]);
   });
 
   it('splits hit-rate series per variant, each indexed from its own game 1', () => {
@@ -235,8 +237,17 @@ describe('analytics by variant', () => {
       1000, 3000,
     ]);
     expect(series.find((s) => s.ring === 'single')!.points.map((p) => p.date)).toEqual([2000]);
-    // Each point also carries the darts thrown that game (21 per cleared leg here).
+    // Each point also carries the darts thrown that game (21 per cleared leg
+    // here) and whether the player cleared the board.
     expect(series.find((s) => s.ring === 'single')!.points[0].darts).toBe(21);
+    expect(series.find((s) => s.ring === 'single')!.points[0].cleared).toBe(true);
+  });
+
+  it('marks lost games as uncleared in the per-variant series', () => {
+    // A loses m3 (doubles, B clears) but clears m1 (single).
+    const series = atcSeriesByVariant([m1, m3], A);
+    expect(series.find((s) => s.ring === 'single')!.points.map((p) => p.cleared)).toEqual([true]);
+    expect(series.find((s) => s.ring === 'double')!.points.map((p) => p.cleared)).toEqual([false]);
   });
 });
 

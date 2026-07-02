@@ -35,7 +35,9 @@ Two reasons:
   Overview, Consistency, Finishing, Scoring and Head-to-Head lenses, and an
   **Around the Clock** mode with a variant selector (Any / Doubles / Trebles /
   Progressive) that shows one variant at a time — in a single card: its stats, a
-  per-game chart pairing Hit % and throws-to-finish, and a per-area table giving
+  per-game chart pairing Hit % and throws-to-finish (games where the board wasn't
+  cleared get a red point, since their dart count was cut short), and a per-area
+  table giving
   the average hit % for every number/bull in that variant (sortable by area or hit
   %, ascending or descending). Once a variant has more than 20 games, an All /
   Last-20 toggle scopes the chart and the area table. Each player's last-viewed tab
