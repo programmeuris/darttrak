@@ -4,11 +4,13 @@ import { Line, Bar } from 'react-chartjs-2';
 import type { ChartData, ChartDataset, ChartOptions, TooltipItem } from 'chart.js';
 import { navigate } from '../router';
 import { toast } from '../toast';
+import { readPref, writePref } from '../prefs';
 import { Header, StatCell } from '../components/Header';
 import { getPlayers, getAllMatches } from '../db';
 import { computePlayerOverview, averagePerMatch, scoreDistribution } from '../stats';
 import { consistencyStats, finishingStats, scoringStats, headToHead } from '../analysis';
 import {
+  ATC_RING_ORDER,
   atcStatsByVariant,
   atcSeriesByVariant,
   atcTargetStats,
@@ -162,27 +164,16 @@ const X01_TABS: { id: X01Lens; label: string }[] = [
   { id: 'h2h', label: 'Head-to-Head' },
 ];
 
-// Remember the last-open tab per player (a per-device UI preference, so it lives
-// in localStorage rather than the player/data model). Falls back to overview.
+// Remember the last-open tab per player. Falls back to overview.
 const TAB_IDS = new Set<string>([...X01_TABS.map((t) => t.id), 'atc']);
-const tabStorageKey = (playerId: string) => `darttrak:statsTab:${playerId}`;
 
 function readStoredTab(playerId: string): TabId {
-  try {
-    const v = localStorage.getItem(tabStorageKey(playerId));
-    if (v && TAB_IDS.has(v)) return v as TabId;
-  } catch {
-    // localStorage can be unavailable (private mode); fall back silently.
-  }
-  return 'overview';
+  const v = readPref(`statsTab:${playerId}`);
+  return v && TAB_IDS.has(v) ? (v as TabId) : 'overview';
 }
 
 function writeStoredTab(playerId: string, tab: TabId): void {
-  try {
-    localStorage.setItem(tabStorageKey(playerId), tab);
-  } catch {
-    // ignore write failures
-  }
+  writePref(`statsTab:${playerId}`, tab);
 }
 
 // When `playerId` is passed (from a player profile) the screen locks to that
@@ -292,7 +283,7 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
         {tab === 'finishing' && <Finishing matches={matches} playerId={playerId} />}
         {tab === 'scoring' && <Scoring matches={matches} playerId={playerId} />}
         {tab === 'h2h' && <HeadToHead matches={matches} playerId={playerId} names={names} />}
-        {tab === 'atc' && <Atc matches={matches} playerId={playerId} />}
+        {tab === 'atc' && <Atc key={playerId} matches={matches} playerId={playerId} />}
       </div>
     </div>
   );
@@ -506,12 +497,33 @@ function HeadToHead({ matches, playerId, names }: { matches: Match[]; playerId: 
 // variant has more games than this.
 const ATC_RECENT_WINDOW = 20;
 
+const RING_IDS = new Set<string>(ATC_RING_ORDER);
+
 function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
   const variants = atcStatsByVariant(matches, playerId);
-  const [activeRing, setActiveRing] = useState<AtcRing | null>(null);
-  const [soloOnly, setSoloOnly] = useState(false);
-  const [recentOnly, setRecentOnly] = useState(false);
+  // The variant and scope toggles are remembered per player, like the tab.
+  // Initializers run once per mount — the component is keyed by playerId, so
+  // switching players re-reads that player's preferences.
+  const [activeRing, setActiveRing] = useState<AtcRing | null>(() => {
+    const v = readPref(`atcRing:${playerId}`);
+    return v && RING_IDS.has(v) ? (v as AtcRing) : null;
+  });
+  const [soloOnly, setSoloOnly] = useState(() => readPref(`atcSolo:${playerId}`) === '1');
+  const [recentOnly, setRecentOnly] = useState(() => readPref(`atcRecent:${playerId}`) === '1');
   if (variants.length === 0) return <Empty text="No completed Around the Clock matches yet." />;
+
+  const selectRing = (r: AtcRing) => {
+    setActiveRing(r);
+    writePref(`atcRing:${playerId}`, r);
+  };
+  const selectSolo = (v: boolean) => {
+    setSoloOnly(v);
+    writePref(`atcSolo:${playerId}`, v ? '1' : '0');
+  };
+  const selectRecent = (v: boolean) => {
+    setRecentOnly(v);
+    writePref(`atcRecent:${playerId}`, v ? '1' : '0');
+  };
 
   // One variant is shown at a time, picked from the selector below. The chart and
   // the per-area table reflect either all games of that variant or just the last
@@ -582,7 +594,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
               key={v.ring}
               className={`chip ${v.ring === active.ring ? 'active' : ''}`}
               aria-pressed={v.ring === active.ring}
-              onClick={() => setActiveRing(v.ring)}
+              onClick={() => selectRing(v.ring)}
             >
               {atcRingLabel(v.ring)}
             </button>
@@ -590,10 +602,15 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         </div>
       )}
       <section className="card" key={active.ring}>
-        <h2 className="card-title">
-          <span className="ring-dot" style={{ background: RING_COLORS[active.ring] }} />{' '}
-          {atcRingLabel(active.ring)}
-        </h2>
+        {/* With a variant selector above, a heading naming the active variant
+            would just repeat the highlighted chip — only single-variant
+            players need the label. */}
+        {variants.length === 1 && (
+          <h2 className="card-title">
+            <span className="ring-dot" style={{ background: RING_COLORS[active.ring] }} />{' '}
+            {atcRingLabel(active.ring)}
+          </h2>
+        )}
         <Grid
           cells={[
             [String(active.competitivePlayed), `Played (${active.played} total)`],
@@ -608,14 +625,14 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             <button
               className={`chip ${soloOnly ? '' : 'active'}`}
               aria-pressed={!soloOnly}
-              onClick={() => setSoloOnly(false)}
+              onClick={() => selectSolo(false)}
             >
               All games ({variantMatches.length})
             </button>
             <button
               className={`chip ${soloOnly ? 'active' : ''}`}
               aria-pressed={soloOnly}
-              onClick={() => setSoloOnly(true)}
+              onClick={() => selectSolo(true)}
             >
               Solo only ({soloMatches.length})
             </button>
@@ -626,14 +643,14 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             <button
               className={`chip ${recentOnly ? '' : 'active'}`}
               aria-pressed={!recentOnly}
-              onClick={() => setRecentOnly(false)}
+              onClick={() => selectRecent(false)}
             >
               All ({totalGames})
             </button>
             <button
               className={`chip ${recentOnly ? 'active' : ''}`}
               aria-pressed={recentOnly}
-              onClick={() => setRecentOnly(true)}
+              onClick={() => selectRecent(true)}
             >
               Last {ATC_RECENT_WINDOW} games
             </button>

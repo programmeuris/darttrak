@@ -560,6 +560,9 @@ describe('player profiles', () => {
     expect(screen.getAllByText('Hit % and throws to finish, per game.')).toHaveLength(1);
     expect(screen.queryByText('Avg Darts to Clear')).toBeNull();
     expect(screen.queryByText('Darts / game')).toBeNull();
+    // With a variant selector shown, the card heading naming the active
+    // variant would only repeat the highlighted chip — it's dropped.
+    expect(document.querySelector('.ring-dot')).toBeNull();
 
     // The per-area breakdown lives in the same card and lists the variant's
     // targets with their hit rate. The single game has one hit on target 1,
@@ -594,6 +597,9 @@ describe('player profiles', () => {
     }
     render(<PlayerStats playerId={alice.id} />);
     fireEvent.click(await screen.findByText('Around the Clock'));
+
+    // A single variant has no selector, so the card keeps its variant heading.
+    expect(document.querySelector('.ring-dot')).toBeTruthy();
 
     // "All (21)" is active by default; the area subtitle reflects the full scope.
     const all = screen.getByRole('button', { name: 'All (21)' });
@@ -652,6 +658,75 @@ describe('player profiles', () => {
     expect(screen.getByText('Average hit % per area, across every solo game.')).toBeTruthy();
     expect(screen.getByText('1/1')).toBeTruthy();
     expect(screen.queryByText('1/2')).toBeNull();
+  });
+
+  it('PlayerStats remembers the ATC variant and scope toggles per player', async () => {
+    const alice = await addPlayer('Alice');
+    const bob = await addPlayer('Bob');
+    // The Any variant mixes solo + multiplayer (so the solo toggle shows);
+    // Progressive exists so the variant selector shows.
+    await saveMatch(
+      makeMatch({
+        id: 'v-any-solo',
+        date: 1000,
+        gameType: 'AroundTheClock',
+        atcRing: 'single',
+        playerIds: [alice.id],
+        status: 'completed',
+        winnerId: alice.id,
+        legs: [makeLeg('v-any-solo', [makeTurn(alice.id, [atcHitDart(1)], 1)], alice.id)],
+      }),
+    );
+    await saveMatch(
+      makeMatch({
+        id: 'v-any-multi',
+        date: 2000,
+        gameType: 'AroundTheClock',
+        atcRing: 'single',
+        playerIds: [alice.id, bob.id],
+        status: 'completed',
+        winnerId: bob.id,
+        legs: [makeLeg('v-any-multi', [makeTurn(alice.id, [atcMissDart(1)], 0)], bob.id)],
+      }),
+    );
+    await saveMatch(
+      makeMatch({
+        id: 'v-prog',
+        date: 3000,
+        gameType: 'AroundTheClock',
+        atcRing: 'progressive',
+        playerIds: [alice.id],
+        status: 'completed',
+        winnerId: alice.id,
+        legs: [makeLeg('v-prog', [makeTurn(alice.id, [atcHitDart(1)], 1)], alice.id)],
+      }),
+    );
+
+    render(<PlayerStats playerId={alice.id} />);
+    fireEvent.click(await screen.findByText('Around the Clock'));
+    fireEvent.click(screen.getByRole('button', { name: 'Solo only (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Progressive' }));
+    cleanup();
+
+    // A fresh mount restores the tab, the variant, and the scope toggle.
+    render(<PlayerStats playerId={alice.id} />);
+    const prog = await screen.findByRole('button', { name: 'Progressive' });
+    expect(prog.className).toContain('active');
+    fireEvent.click(screen.getByRole('button', { name: 'Any' }));
+    expect(screen.getByRole('button', { name: 'Solo only (1)' }).className).toContain('active');
+  });
+
+  it('Setup remembers the last-used match configuration', async () => {
+    render(<Setup />);
+    fireEvent.click(screen.getByRole('button', { name: '301' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Best of 3' }));
+    cleanup();
+
+    render(<Setup />);
+    expect(screen.getByRole('button', { name: '301' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Best of 3' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
   });
 
   it('PlayerStats ATC area table sorts by area and hit %, both directions', async () => {
