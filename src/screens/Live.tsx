@@ -73,7 +73,13 @@ export function Live({ matchId }: { matchId: string }) {
       if (!active) return;
       setNames(map);
       setMatch(m);
-    })();
+    })().catch((err) => {
+      // Without this a rejected read strands the user on a blank screen.
+      if (!active) return;
+      console.error(err);
+      toast('Failed to load the match', 'error');
+      navigate('/');
+    });
     return () => {
       active = false;
     };
@@ -167,29 +173,40 @@ export function Live({ matchId }: { matchId: string }) {
         isBust: bust,
         timestamp: Date.now(),
       } satisfies Turn);
+      let winsMatch = false;
+      if (win) {
+        nextLeg.winnerId = turnPlayer;
+        winsMatch = (legsWonBy(next).get(turnPlayer) ?? 0) >= legsToWin(next);
+        if (winsMatch) {
+          next.winnerId = turnPlayer;
+          next.status = 'completed';
+        } else {
+          next.legs.push({ id: uuid(), matchId: next.id, winnerId: null, turns: [] });
+        }
+      }
+
+      await saveMatch(next);
+      // Only a persisted turn clears the input — on a failed save the darts
+      // stay in the slots so the player can retry instead of silently losing
+      // them.
       setCurrentDarts([]);
       setMultiplier(1);
 
+      if (winsMatch) {
+        toast(`${nameOf(turnPlayer)} wins the match!`);
+        navigate(`/summary/${next.id}`);
+        return;
+      }
       if (win) {
-        nextLeg.winnerId = turnPlayer;
-        if ((legsWonBy(next).get(turnPlayer) ?? 0) >= legsToWin(next)) {
-          next.winnerId = turnPlayer;
-          next.status = 'completed';
-          await saveMatch(next);
-          toast(`${nameOf(turnPlayer)} wins the match!`);
-          navigate(`/summary/${next.id}`);
-          return;
-        }
-        next.legs.push({ id: uuid(), matchId: next.id, winnerId: null, turns: [] });
-        await saveMatch(next);
         toast(`${nameOf(turnPlayer)} wins the leg!`);
         setMatch(next);
         return;
       }
-
-      await saveMatch(next);
       if (bust) toast('Bust!');
       setMatch(next);
+    } catch (err) {
+      console.error(err);
+      toast('Save failed — the turn was not recorded. Try again.', 'error');
     } finally {
       submitting.current = false;
       setSaving(false);
@@ -215,10 +232,13 @@ export function Live({ matchId }: { matchId: string }) {
       lastLeg.winnerId = null;
       next.winnerId = null;
       next.status = 'in_progress';
-      setCurrentDarts([]);
       await saveMatch(next);
+      setCurrentDarts([]);
       toast('Last turn undone');
       setMatch(next);
+    } catch (err) {
+      console.error(err);
+      toast('Save failed — the undo was not applied. Try again.', 'error');
     } finally {
       submitting.current = false;
       setSaving(false);

@@ -58,15 +58,23 @@ function LiveRoute({ matchId }: { matchId: string }) {
   const [isAtc, setIsAtc] = useState<boolean | null | undefined>(undefined);
   useEffect(() => {
     let active = true;
-    getMatch(matchId).then((m) => {
-      if (!active) return;
-      if (!m) {
-        toast('Match not found', 'error');
+    getMatch(matchId)
+      .then((m) => {
+        if (!active) return;
+        if (!m) {
+          toast('Match not found', 'error');
+          setIsAtc(null);
+          return;
+        }
+        setIsAtc(m.gameType === 'AroundTheClock');
+      })
+      .catch((err) => {
+        // Without this a rejected read strands the user on a blank screen.
+        if (!active) return;
+        console.error(err);
+        toast('Failed to load the match', 'error');
         setIsAtc(null);
-        return;
-      }
-      setIsAtc(m.gameType === 'AroundTheClock');
-    });
+      });
     return () => {
       active = false;
     };

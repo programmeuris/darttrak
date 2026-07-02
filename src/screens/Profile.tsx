@@ -27,7 +27,13 @@ export function Profile({ playerId }: { playerId: string }) {
       setPlayer(p);
       const matches = await getMatchesByPlayer(playerId);
       if (active) setMatchCount(matches.length);
-    })();
+    })().catch((err) => {
+      // Without this a rejected read strands the user on a blank screen.
+      if (!active) return;
+      console.error(err);
+      toast('Failed to load the profile', 'error');
+      navigate('/');
+    });
     return () => {
       active = false;
     };
