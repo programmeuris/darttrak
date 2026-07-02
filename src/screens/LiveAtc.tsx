@@ -68,11 +68,11 @@ export function LiveAtc({ matchId }: { matchId: string }) {
       if (!active) return;
       if (!m) {
         toast('Match not found', 'error');
-        navigate('/');
+        navigate('/', { replace: true });
         return;
       }
       if (m.status === 'completed') {
-        navigate(`/summary/${matchId}`);
+        navigate(`/summary/${matchId}`, { replace: true });
         return;
       }
       const players = await getPlayers();
@@ -86,7 +86,7 @@ export function LiveAtc({ matchId }: { matchId: string }) {
       if (!active) return;
       console.error(err);
       toast('Failed to load the match', 'error');
-      navigate('/');
+      navigate('/', { replace: true });
     });
     return () => {
       active = false;
@@ -177,7 +177,9 @@ export function LiveAtc({ matchId }: { matchId: string }) {
 
       if (winsMatch) {
         toast(`${nameOf(turnPlayer)} wins the match!`);
-        navigate(`/summary/${next.id}`);
+        // Replace so Back from the summary goes home, not to a dead live
+        // screen that would only redirect forward again.
+        navigate(`/summary/${next.id}`, { replace: true });
         return;
       }
       if (clearedBoard) {

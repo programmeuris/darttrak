@@ -292,6 +292,28 @@ describe('screens render without crashing', () => {
     errSpy.mockRestore();
   });
 
+  it('Live redirects a completed match to Summary by replacing the history entry', async () => {
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: 'm-done',
+        gameType: '501',
+        playerIds: [alice.id],
+        status: 'completed',
+        winnerId: alice.id,
+        legs: [makeLeg('m-done', [], alice.id)],
+      }),
+    );
+    location.hash = '#/live/m-done'; // arriving on the live route pushes an entry
+    const before = history.length;
+    render(<Live matchId="m-done" />);
+
+    await waitFor(() => expect(location.hash).toBe('#/summary/m-done'));
+    // Replaced, not pushed — otherwise Back lands on the live route, which
+    // redirects forward again and traps the Back button forever.
+    expect(history.length).toBe(before);
+  });
+
   it('LiveAtc ignores a double-tap on Confirm right after a turn is recorded', async () => {
     const alice = await addPlayer('Alice');
     const bob = await addPlayer('Bob');

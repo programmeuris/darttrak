@@ -21,7 +21,7 @@ export function Profile({ playerId }: { playerId: string }) {
       if (!active) return;
       if (!p) {
         toast('Player not found', 'error');
-        navigate('/');
+        navigate('/', { replace: true });
         return;
       }
       setPlayer(p);
@@ -32,7 +32,7 @@ export function Profile({ playerId }: { playerId: string }) {
       if (!active) return;
       console.error(err);
       toast('Failed to load the profile', 'error');
-      navigate('/');
+      navigate('/', { replace: true });
     });
     return () => {
       active = false;
