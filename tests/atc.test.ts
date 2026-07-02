@@ -12,7 +12,6 @@ import {
   atcHitRate,
   atcFewestDartsToComplete,
   atcStatsByVariant,
-  atcPerMatch,
   atcProgressiveSteps,
   atcSeriesByVariant,
   atcTargetStats,
@@ -215,12 +214,31 @@ describe('analytics by variant', () => {
     expect(triple.winRate).toBe(0);
   });
 
-  it('returns per-match points sorted oldest first', () => {
-    const points = atcPerMatch([m3, m1, m2], A);
-    expect(points.map((p) => p.date)).toEqual([1000, 2000, 3000]);
-    expect(points.map((p) => p.ring)).toEqual(['single', 'progressive', 'double']);
-    // A cleared m1 and m2 but lost m3 (B cleared it), so m3 is uncleared.
-    expect(points.map((p) => p.cleared)).toEqual([true, true, false]);
+  it('emits one point per leg for multi-leg matches', () => {
+    // Best-of-3 where A clears leg 1 in 21 darts and loses leg 2 to B after
+    // 3 darts (1 hit) — each leg is its own attempt at the board, so each
+    // gets its own point instead of pooling into one format-dependent total.
+    const lostLeg = clearLeg(B);
+    lostLeg.turns.push(makeTurn(A, [atcMissDart(1), atcMissDart(1), atcHitDart(1)], 1));
+    const multi = makeMatch({
+      id: 'multi',
+      date: 9000,
+      gameType: 'AroundTheClock',
+      atcRing: 'single',
+      playerIds: [A, B],
+      winnerId: B,
+      format: { legs: 3, sets: 1 },
+      legs: [clearLeg(A), lostLeg],
+    });
+
+    const pts = atcSeriesByVariant([multi], A).find((s) => s.ring === 'single')!.points;
+    expect(pts).toHaveLength(2);
+    expect(pts.map((p) => p.cleared)).toEqual([true, false]);
+    expect(pts[0].darts).toBe(21);
+    expect(pts[1].darts).toBe(3);
+    expect(pts[1].hitRate).toBeCloseTo((1 / 3) * 100, 5);
+    // Same-date legs are disambiguated in the tooltip label.
+    expect(pts[1].label).toContain('Leg 2');
   });
 
   it('splits hit-rate series per variant, each indexed from its own game 1', () => {

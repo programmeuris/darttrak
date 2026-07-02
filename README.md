@@ -35,9 +35,10 @@ Two reasons:
   Overview, Consistency, Finishing, Scoring and Head-to-Head lenses, and an
   **Around the Clock** mode with a variant selector (Any / Doubles / Trebles /
   Progressive) that shows one variant at a time — in a single card: its stats, a
-  per-game chart pairing Hit % and throws-to-finish (games where the board wasn't
-  cleared get a red point, since their dart count was cut short), and a per-area
-  table giving
+  per-leg chart pairing Hit % and throws-to-finish (one point per leg, so
+  multi-leg games don't pool into a format-dependent total; legs where the board
+  wasn't cleared get a red point, since their dart count was cut short), and a
+  per-area table giving
   the average hit % for every number/bull in that variant (sortable by area or hit
   %, ascending or descending). When a variant mixes solo and multiplayer games, a
   Solo-only toggle scopes the chart and area table to just the games you entered

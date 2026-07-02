@@ -557,9 +557,9 @@ describe('player profiles', () => {
     fireEvent.click(await screen.findByText('Around the Clock'));
 
     // Only one variant's combined chart is shown — no bar chart, no metric toggle.
-    expect(screen.getAllByText('Hit % and throws to finish, per game.')).toHaveLength(1);
+    expect(screen.getAllByText('Hit % and throws to finish, per leg.')).toHaveLength(1);
     expect(screen.queryByText('Avg Darts to Clear')).toBeNull();
-    expect(screen.queryByText('Darts / game')).toBeNull();
+    expect(screen.queryByText('Darts / leg')).toBeNull();
     // With a variant selector shown, the card heading naming the active
     // variant would only repeat the highlighted chip — it's dropped.
     expect(document.querySelector('.ring-dot')).toBeNull();
