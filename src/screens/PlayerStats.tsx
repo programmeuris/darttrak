@@ -59,8 +59,14 @@ function atcVariantOpts(points: { label: string; cleared: boolean }[]): ChartOpt
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
     plugins: {
-      legend: { labels: { color: TEXT } },
+      // Dataset `order` flips the legend and tooltip listing along with the
+      // draw order, so both are pinned back to dataset order (Hit % first).
+      legend: {
+        labels: { color: TEXT, sort: (a, b) => (a.datasetIndex ?? 0) - (b.datasetIndex ?? 0) },
+      },
       tooltip: {
+        itemSort: (a: TooltipItem<'line'>, b: TooltipItem<'line'>) =>
+          a.datasetIndex - b.datasetIndex,
         callbacks: {
           title: (items: TooltipItem<'line'>[]) => points[items[0]?.dataIndex ?? 0]?.label ?? '',
           label: (ctx: TooltipItem<'line'>) => {
@@ -492,6 +498,7 @@ const ATC_RECENT_WINDOW = 20;
 function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
   const variants = atcStatsByVariant(matches, playerId);
   const [activeRing, setActiveRing] = useState<AtcRing | null>(null);
+  const [soloOnly, setSoloOnly] = useState(false);
   const [recentOnly, setRecentOnly] = useState(false);
   if (variants.length === 0) return <Empty text="No completed Around the Clock matches yet." />;
 
@@ -500,14 +507,28 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
   // ATC_RECENT_WINDOW; the stat grid above stays all-time.
   const active = variants.find((v) => v.ring === activeRing) ?? variants[0];
   const variantMatches = atcVariantMatches(matches, playerId, active.ring);
-  const totalGames = variantMatches.length;
+  // Solo games are the ones the player entered themselves, so they're the most
+  // trustworthy progression data — in multiplayer games someone else may have
+  // entered the darts, possibly out of throw order, which misattributes targets
+  // in the per-area table's reconstruction. The toggle only appears when the
+  // variant has both kinds; the solo filter applies before the Last-N slice.
+  const soloMatches = variantMatches.filter((m) => m.playerIds.length === 1);
+  const canFilterSolo = soloMatches.length > 0 && soloMatches.length < variantMatches.length;
+  const soloScoped = canFilterSolo && soloOnly;
+  const base = soloScoped ? soloMatches : variantMatches;
+  const totalGames = base.length;
   const canScope = totalGames > ATC_RECENT_WINDOW;
-  const scoped = canScope && recentOnly ? variantMatches.slice(-ATC_RECENT_WINDOW) : variantMatches;
+  const scoped = canScope && recentOnly ? base.slice(-ATC_RECENT_WINDOW) : base;
   // Each variant is indexed by its own game count so its chart starts at game 1.
   const points = atcSeriesByVariant(scoped, playerId).find((s) => s.ring === active.ring)?.points ?? [];
   const targets = atcTargetStats(scoped, playerId, active.ring);
+  const gamesNoun = soloScoped ? 'solo games' : 'games';
   const scopeNote =
-    canScope && recentOnly ? `the last ${ATC_RECENT_WINDOW} games` : 'every game';
+    canScope && recentOnly
+      ? `the last ${ATC_RECENT_WINDOW} ${gamesNoun}`
+      : soloScoped
+        ? 'every solo game'
+        : 'every game';
   const chartData: ChartData<'line'> = {
     labels: points.map((_, i) => `Game ${i + 1}`),
     datasets: [
@@ -519,6 +540,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         tension: 0.25,
         pointRadius: 3,
         yAxisID: 'y',
+        order: 2,
       },
       {
         label: 'Darts / game',
@@ -533,6 +555,9 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         tension: 0.25,
         pointRadius: 3,
         yAxisID: 'yDarts',
+        // Lower order draws on top: the amber/red points stay visible where the
+        // two lines cross, instead of hiding under the Hit % points.
+        order: 1,
       },
     ],
   };
@@ -566,6 +591,22 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             [active.avgDartsToClear > 0 ? active.avgDartsToClear.toFixed(0) : '—', 'Avg Darts'],
           ]}
         />
+        {canFilterSolo && (
+          <div className="chip-row scope-row">
+            <button
+              className={`chip ${soloOnly ? '' : 'active'}`}
+              onClick={() => setSoloOnly(false)}
+            >
+              All games ({variantMatches.length})
+            </button>
+            <button
+              className={`chip ${soloOnly ? 'active' : ''}`}
+              onClick={() => setSoloOnly(true)}
+            >
+              Solo only ({soloMatches.length})
+            </button>
+          </div>
+        )}
         {canScope && (
           <div className="chip-row scope-row">
             <button

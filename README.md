@@ -39,9 +39,10 @@ Two reasons:
   cleared get a red point, since their dart count was cut short), and a per-area
   table giving
   the average hit % for every number/bull in that variant (sortable by area or hit
-  %, ascending or descending). Once a variant has more than 20 games, an All /
-  Last-20 toggle scopes the chart and the area table. Each player's last-viewed tab
-  is remembered.
+  %, ascending or descending). When a variant mixes solo and multiplayer games, a
+  Solo-only toggle scopes the chart and area table to just the games you entered
+  yourself; once more than 20 games are in scope, an All / Last-20 toggle narrows
+  them further. Each player's last-viewed tab is remembered.
 - **Backup & restore**: export all data to JSON and re-import it (your only backup)
 - **Installable PWA** — works offline once loaded; "Add to Home Screen" on
   Chrome / Safari
