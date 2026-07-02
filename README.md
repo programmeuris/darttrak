@@ -131,7 +131,9 @@ smoke-tests for the React screens.
   without a double (when Double Out is on), or would leave exactly 1.
 - 3-dart average = `(total points scored / darts thrown) * 3`; busts score 0 but
   still count their darts.
-- Checkout % = winning turns ÷ turns that started with ≤ 170 remaining.
+- Checkout % = winning turns ÷ turns that started in checkout range: ≤ 170
+  remaining with Double Out, ≤ 180 with Straight Out (where T20 T20 T20 is a
+  legal finish).
 
 ## Stretch goals (not yet implemented)
 

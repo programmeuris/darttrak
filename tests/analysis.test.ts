@@ -73,6 +73,70 @@ describe('finishingStats', () => {
   });
 });
 
+describe('finishingStats in straight-out games', () => {
+  // A leaves exactly 180 and finishes with T20 T20 T20 — legal straight-out,
+  // impossible under double-out (where the cap is 170).
+  const straight: Match = makeMatch({
+    id: 's1',
+    date: 4000,
+    gameType: '501',
+    doubleOut: false,
+    playerIds: [A],
+    winnerId: A,
+    legs: [
+      makeLeg(
+        's1',
+        [
+          makeTurn(A, [T(20), T(20), T(20)], 321), // 180 → 321 left
+          makeTurn(A, [T(20), T(19), dart(24, 'D12', true)], 180), // 141 → 180 left
+          makeTurn(A, [T(20), T(20), T(20)], 0), // 180 checkout
+        ],
+        A,
+      ),
+    ],
+  });
+  // A checkout of 1 (single 1), only reachable straight-out.
+  const tiny: Match = makeMatch({
+    id: 's2',
+    date: 5000,
+    gameType: '301',
+    doubleOut: false,
+    playerIds: [A],
+    winnerId: A,
+    legs: [
+      makeLeg(
+        's2',
+        [
+          makeTurn(A, [T(20), T(20), T(20)], 121), // 180 → 121 left
+          makeTurn(A, [T(20), T(20), MISS], 1), // 120 → 1 left (no bust straight-out)
+          makeTurn(A, [S(1)], 0), // checkout 1
+        ],
+        A,
+      ),
+    ],
+  });
+
+  const f = finishingStats([straight, tiny], A);
+  it('uses the 180 cap for straight-out matches', () => {
+    // Chances: 180 (taken), 121 (missed), 1 (taken). The 180 finish would
+    // not even count as a chance under the double-out cap.
+    expect(f.opportunities).toBe(3);
+    expect(f.checkouts).toBe(2);
+    expect(f.bestCheckout).toBe(180);
+  });
+  it('bands cover the full 1–180 checkout range', () => {
+    // 1 lands in the first band, 180 in the last — under the old 2–170
+    // bands both fell outside and the chart disagreed with the checkout count.
+    expect(f.bands.counts).toEqual([1, 0, 0, 1]);
+    expect(f.bands.counts.reduce((a, b) => a + b, 0)).toBe(f.checkouts);
+  });
+  it('keeps per-match caps when pooling double-out and straight-out games', () => {
+    const mixed = finishingStats([m1, straight], A);
+    expect(mixed.opportunities).toBe(3); // 2 from m1 (double-out) + 1 straight-out
+    expect(mixed.bestCheckout).toBe(180);
+  });
+});
+
 describe('scoringStats', () => {
   const s = scoringStats([m1], A);
   it('first-9 average over the first three visits', () => {

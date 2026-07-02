@@ -1,5 +1,5 @@
 import type { Match, Leg, Turn } from './types';
-import { calculateAverage, isX01 } from './scoring';
+import { calculateAverage, checkoutCap, isX01 } from './scoring';
 
 // ---- shared helpers ----
 
@@ -126,7 +126,9 @@ export function consistencyStats(
 // =====================================================================
 
 export interface FinishingStats {
-  opportunities: number; // visits starting <= 170
+  // Visits that started within checkout range for their match's rules:
+  // <= 170 with double-out, <= 180 straight-out (see scoring.checkoutCap).
+  opportunities: number;
   checkouts: number;
   checkoutPercent: number;
   bestCheckout: number;
@@ -135,24 +137,30 @@ export interface FinishingStats {
   perMatch: { label: string; date: number; checkoutPercent: number }[];
 }
 
+// Cover 1–180 so every legal checkout lands in a band: straight-out allows
+// finishes of 1 and above 170, which double-out-only ranges would drop.
 const CHECKOUT_BANDS: { label: string; min: number; max: number }[] = [
-  { label: '2–40', min: 2, max: 40 },
+  { label: '1–40', min: 1, max: 40 },
   { label: '41–80', min: 41, max: 80 },
   { label: '81–120', min: 81, max: 120 },
-  { label: '121–170', min: 121, max: 170 },
+  { label: '121–180', min: 121, max: 180 },
 ];
 
-function finishingFor(turns: Turn[]): {
+function finishingFor(
+  turns: Turn[],
+  doubleOut: boolean,
+): {
   opportunities: number;
   checkouts: number;
   checkoutScores: number[];
 } {
+  const cap = checkoutCap(doubleOut);
   let opportunities = 0;
   let checkouts = 0;
   const checkoutScores: number[] = [];
   for (const turn of turns) {
     const start = startRemaining(turn);
-    if (start > 0 && start <= 170) {
+    if (start > 0 && start <= cap) {
       opportunities++;
       if (!turn.isBust && turn.remainingScore === 0) {
         checkouts++;
@@ -168,17 +176,27 @@ export function finishingStats(
   playerId: string,
 ): FinishingStats {
   const played = playerMatches(matches, playerId);
-  const all = finishingFor(turnsForPlayer(legsOf(played), playerId));
+  // Aggregate per match: the checkout range depends on each match's own
+  // double-out setting, so the turns can't be pooled before counting.
+  let opportunities = 0;
+  let checkouts = 0;
+  const checkoutScores: number[] = [];
+  for (const m of played) {
+    const f = finishingFor(turnsForPlayer(m.legs, playerId), m.doubleOut);
+    opportunities += f.opportunities;
+    checkouts += f.checkouts;
+    checkoutScores.push(...f.checkoutScores);
+  }
 
   const counts = new Array(CHECKOUT_BANDS.length).fill(0);
-  for (const score of all.checkoutScores) {
+  for (const score of checkoutScores) {
     const idx = CHECKOUT_BANDS.findIndex((b) => score >= b.min && score <= b.max);
     if (idx >= 0) counts[idx]++;
   }
 
   const perMatch = played
     .map((m) => {
-      const f = finishingFor(turnsForPlayer(m.legs, playerId));
+      const f = finishingFor(turnsForPlayer(m.legs, playerId), m.doubleOut);
       return {
         label: dateLabel(m.date),
         date: m.date,
@@ -191,12 +209,11 @@ export function finishingStats(
     .map(({ label, date, checkoutPercent }) => ({ label, date, checkoutPercent }));
 
   return {
-    opportunities: all.opportunities,
-    checkouts: all.checkouts,
-    checkoutPercent:
-      all.opportunities === 0 ? 0 : (all.checkouts / all.opportunities) * 100,
-    bestCheckout: all.checkoutScores.length ? Math.max(...all.checkoutScores) : 0,
-    averageCheckout: mean(all.checkoutScores),
+    opportunities,
+    checkouts,
+    checkoutPercent: opportunities === 0 ? 0 : (checkouts / opportunities) * 100,
+    bestCheckout: checkoutScores.length ? Math.max(...checkoutScores) : 0,
+    averageCheckout: mean(checkoutScores),
     bands: { labels: CHECKOUT_BANDS.map((b) => b.label), counts },
     perMatch,
   };
