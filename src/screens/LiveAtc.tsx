@@ -45,11 +45,21 @@ function dartLabel(target: number, steps: number, ring: AtcRing): string {
   return `✓${atcTargetLabel(target, ring)}`;
 }
 
+// Ignore fill-presses on Confirm this soon after a turn was recorded: a
+// double-tap's second hit lands well inside this window, and without it that
+// hit would start pre-filling the NEXT player's darts as misses.
+const FILL_COOLDOWN_MS = 400;
+
 export function LiveAtc({ matchId }: { matchId: string }) {
   const [match, setMatch] = useState<Match | null>(null);
   const [names, setNames] = useState<Map<string, string>>(new Map());
   const [currentDarts, setCurrentDarts] = useState<DartThrow[]>([]);
+  // Ref for a synchronous double-tap guard; state to disable the inputs while
+  // a save is in flight (during that window `match` is stale, so a tap would
+  // otherwise be attributed to the wrong player).
   const submitting = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const lastRecordAt = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -86,7 +96,7 @@ export function LiveAtc({ matchId }: { matchId: string }) {
   const startProgress = atcProgress(leg, turnPlayer);
   const liveProgress = Math.min(startProgress + hitsIn(currentDarts), ATC_TARGET_COUNT);
   const hasWon = liveProgress >= ATC_TARGET_COUNT;
-  const inputLocked = currentDarts.length >= 3 || hasWon;
+  const inputLocked = currentDarts.length >= 3 || hasWon || saving;
   const currentTargetNum = ATC_SEQUENCE[Math.min(liveProgress, ATC_TARGET_COUNT - 1)];
   // The bull only has an outer (25) and inner/double (50) — no treble — so the
   // +3 button is disabled once the target reaches the bull.
@@ -106,12 +116,16 @@ export function LiveAtc({ matchId }: { matchId: string }) {
   }
 
   async function confirmTurn() {
-    if (!match) return;
+    // The double-tap guard must run before the fill branch: after a recorded
+    // turn the slots are empty again, so a second tap would otherwise start
+    // filling the next player's darts as misses.
+    if (!match || submitting.current) return;
     // A turn is three darts. Clearing the board early is the one exception —
     // then the win confirms without filling the remaining slots. Otherwise the
     // first press fills any unthrown darts as misses on the current target, and
     // the player presses again to confirm the now-complete turn.
     if (!hasWon && currentDarts.length < 3) {
+      if (Date.now() - lastRecordAt.current < FILL_COOLDOWN_MS) return;
       const fill = 3 - currentDarts.length;
       const missLabel = dartLabel(currentTargetNum, 0, ring);
       setCurrentDarts((d) => [
@@ -120,8 +134,9 @@ export function LiveAtc({ matchId }: { matchId: string }) {
       ]);
       return;
     }
-    if (submitting.current) return; // guard against double-tap recording the turn twice
     submitting.current = true;
+    setSaving(true);
+    lastRecordAt.current = Date.now();
     try {
       const hits = hitsIn(currentDarts);
       const newProgress = Math.min(startProgress + hits, ATC_TARGET_COUNT);
@@ -157,26 +172,37 @@ export function LiveAtc({ matchId }: { matchId: string }) {
       setMatch(next);
     } finally {
       submitting.current = false;
+      setSaving(false);
     }
   }
 
   async function undoLastTurn() {
-    if (!match) return;
-    const next = structuredClone(match);
-    while (next.legs.length > 1 && activeLeg(next).turns.length === 0) next.legs.pop();
-    const lastLeg = activeLeg(next);
-    if (lastLeg.turns.length === 0) {
-      toast('Nothing to undo', 'error');
-      return;
+    // Shares the confirm guard: undoing while a confirm is saving would clone
+    // the stale match and silently drop the just-recorded turn (and a
+    // double-tapped undo would remove one turn while looking like two).
+    if (!match || submitting.current) return;
+    submitting.current = true;
+    setSaving(true);
+    try {
+      const next = structuredClone(match);
+      while (next.legs.length > 1 && activeLeg(next).turns.length === 0) next.legs.pop();
+      const lastLeg = activeLeg(next);
+      if (lastLeg.turns.length === 0) {
+        toast('Nothing to undo', 'error');
+        return;
+      }
+      lastLeg.turns.pop();
+      lastLeg.winnerId = null;
+      next.winnerId = null;
+      next.status = 'in_progress';
+      setCurrentDarts([]);
+      await saveMatch(next);
+      toast('Last turn undone');
+      setMatch(next);
+    } finally {
+      submitting.current = false;
+      setSaving(false);
     }
-    lastLeg.turns.pop();
-    lastLeg.winnerId = null;
-    next.winnerId = null;
-    next.status = 'in_progress';
-    setCurrentDarts([]);
-    await saveMatch(next);
-    toast('Last turn undone');
-    setMatch(next);
   }
 
   const allTurns: { turn: Turn; legIndex: number }[] = [];
@@ -271,11 +297,16 @@ export function LiveAtc({ matchId }: { matchId: string }) {
       )}
 
       <div className="live-actions">
-        <button className="btn" disabled={currentDarts.length === 0} onClick={() => setCurrentDarts((d) => d.slice(0, -1))}>
+        <button
+          className="btn"
+          disabled={currentDarts.length === 0 || saving}
+          onClick={() => setCurrentDarts((d) => d.slice(0, -1))}
+        >
           ↶ Undo Dart
         </button>
         <button
           className={`btn primary ${hasWon ? 'success' : ''}`}
+          disabled={saving}
           onClick={confirmTurn}
         >
           {hasWon
@@ -287,7 +318,7 @@ export function LiveAtc({ matchId }: { matchId: string }) {
       </div>
 
       <div className="undo-turn-row">
-        <button className="btn ghost" onClick={undoLastTurn}>
+        <button className="btn ghost" disabled={saving} onClick={undoLastTurn}>
           ⟲ Undo Last Turn
         </button>
       </div>

@@ -204,6 +204,71 @@ describe('screens render without crashing', () => {
     expect(single.getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('Live ignores a double-tap on Confirm right after a turn is recorded', async () => {
+    const alice = await addPlayer('Alice');
+    const bob = await addPlayer('Bob');
+    await saveMatch(
+      makeMatch({
+        id: 'm-dtap',
+        gameType: '501',
+        playerIds: [alice.id, bob.id],
+        status: 'in_progress',
+        legs: [makeLeg('m-dtap', [])],
+      }),
+    );
+    const { container } = render(<Live matchId="m-dtap" />);
+    await screen.findByText('Alice');
+
+    // Alice records a full turn.
+    fireEvent.click(screen.getByRole('button', { name: '20' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Miss Remaining (1/3)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Turn (3/3)' }));
+
+    // Once the save settles it's Bob's turn; the immediate next press (the
+    // double-tap's second hit) must NOT pre-fill Bob's darts as misses.
+    const fillBtn = (await screen.findByRole('button', {
+      name: 'Miss Remaining (0/3)',
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(fillBtn.disabled).toBe(false));
+    fireEvent.click(fillBtn);
+    expect(container.querySelectorAll('.dart-slot.filled')).toHaveLength(0);
+
+    // A deliberate press after the cooldown still fills as designed.
+    const later = Date.now() + 1000;
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(later);
+    fireEvent.click(fillBtn);
+    nowSpy.mockRestore();
+    expect(container.querySelectorAll('.dart-slot.filled')).toHaveLength(3);
+  });
+
+  it('LiveAtc ignores a double-tap on Confirm right after a turn is recorded', async () => {
+    const alice = await addPlayer('Alice');
+    const bob = await addPlayer('Bob');
+    await saveMatch(
+      makeMatch({
+        id: 'atc-dtap',
+        gameType: 'AroundTheClock',
+        atcRing: 'single',
+        playerIds: [alice.id, bob.id],
+        status: 'in_progress',
+        legs: [makeLeg('atc-dtap', [])],
+      }),
+    );
+    const { container } = render(<LiveAtc matchId="atc-dtap" />);
+    await screen.findByText('Alice');
+
+    fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Miss Remaining (1/3)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Turn (3/3)' }));
+
+    const fillBtn = (await screen.findByRole('button', {
+      name: 'Miss Remaining (0/3)',
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(fillBtn.disabled).toBe(false));
+    fireEvent.click(fillBtn);
+    expect(container.querySelectorAll('.dart-slot.filled')).toHaveLength(0);
+  });
+
   it('LiveAtc fills the remaining darts as misses, then confirms on the next press', async () => {
     const alice = await addPlayer('Alice');
     const match = makeMatch({
