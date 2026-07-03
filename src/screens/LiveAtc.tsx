@@ -49,6 +49,10 @@ function dartLabel(target: number, steps: number, ring: AtcRing): string {
 // double-tap's second hit lands well inside this window, and without it that
 // hit would start pre-filling the NEXT player's darts as misses.
 const FILL_COOLDOWN_MS = 400;
+// How long the Undo Last Turn button stays armed after its first press before
+// reverting — long enough to read the red confirm state, short enough that a
+// stray tap doesn't leave a live undo lying in wait.
+const UNDO_CONFIRM_MS = 3000;
 
 export function LiveAtc({ matchId }: { matchId: string }) {
   const [match, setMatch] = useState<Match | null>(null);
@@ -60,6 +64,10 @@ export function LiveAtc({ matchId }: { matchId: string }) {
   const submitting = useRef(false);
   const [saving, setSaving] = useState(false);
   const lastRecordAt = useRef(0);
+  // Undo Last Turn sits next to Confirm, so it takes two presses: the first
+  // arms it (highlighted red), the second undoes. Any other input disarms it.
+  const [undoArmed, setUndoArmed] = useState(false);
+  const undoArmTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
@@ -93,6 +101,8 @@ export function LiveAtc({ matchId }: { matchId: string }) {
     };
   }, [matchId]);
 
+  useEffect(() => () => window.clearTimeout(undoArmTimer.current), []);
+
   if (!match) return <div className="screen" />;
 
   const ring = match.atcRing ?? 'single';
@@ -109,7 +119,30 @@ export function LiveAtc({ matchId }: { matchId: string }) {
   const onBull = !hasWon && currentTargetNum === 25;
   const nameOf = (id: string) => names.get(id) ?? '?';
 
+  function disarmUndo() {
+    window.clearTimeout(undoArmTimer.current);
+    undoArmTimer.current = undefined;
+    setUndoArmed(false);
+  }
+
+  function pressUndoTurn() {
+    if (!match || saving) return;
+    if (!match.legs.some((l) => l.turns.length > 0)) {
+      toast('Nothing to undo', 'error');
+      return;
+    }
+    if (!undoArmed) {
+      setUndoArmed(true);
+      window.clearTimeout(undoArmTimer.current);
+      undoArmTimer.current = window.setTimeout(() => setUndoArmed(false), UNDO_CONFIRM_MS);
+      return;
+    }
+    disarmUndo();
+    void undoLastTurn();
+  }
+
   function addStep(steps: number) {
+    disarmUndo();
     if (inputLocked) return;
     const progressNow = Math.min(startProgress + hitsIn(currentDarts), ATC_TARGET_COUNT);
     if (progressNow >= ATC_TARGET_COUNT) return;
@@ -122,6 +155,7 @@ export function LiveAtc({ matchId }: { matchId: string }) {
   }
 
   async function confirmTurn() {
+    disarmUndo();
     // The double-tap guard must run before the fill branch: after a recorded
     // turn the slots are empty again, so a second tap would otherwise start
     // filling the next player's darts as misses.
@@ -324,7 +358,10 @@ export function LiveAtc({ matchId }: { matchId: string }) {
         <button
           className="btn"
           disabled={currentDarts.length === 0 || saving}
-          onClick={() => setCurrentDarts((d) => d.slice(0, -1))}
+          onClick={() => {
+            disarmUndo();
+            setCurrentDarts((d) => d.slice(0, -1));
+          }}
         >
           ↶ Undo Dart
         </button>
@@ -342,8 +379,12 @@ export function LiveAtc({ matchId }: { matchId: string }) {
       </div>
 
       <div className="undo-turn-row">
-        <button className="btn ghost" disabled={saving} onClick={undoLastTurn}>
-          ⟲ Undo Last Turn
+        <button
+          className={`btn ${undoArmed ? 'danger' : 'ghost'}`}
+          disabled={saving}
+          onClick={pressUndoTurn}
+        >
+          {undoArmed ? 'Tap again to undo last turn' : '⟲ Undo Last Turn'}
         </button>
       </div>
 
