@@ -244,6 +244,83 @@ describe('screens render without crashing', () => {
     expect(container.querySelectorAll('.dart-slot.filled')).toHaveLength(3);
   });
 
+  it('Live requires a second press (armed red) to undo the last turn', async () => {
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: 'm-undo2',
+        gameType: '501',
+        playerIds: [alice.id],
+        status: 'in_progress',
+        legs: [makeLeg('m-undo2', [makeTurn(alice.id, [S(20), S(20), S(20)], 441)])],
+      }),
+    );
+    render(<Live matchId="m-undo2" />);
+    await screen.findAllByText('Alice');
+
+    // First press only arms the button: it turns into a red confirm and
+    // nothing is undone yet.
+    fireEvent.click(screen.getByRole('button', { name: '⟲ Undo Last Turn' }));
+    const armed = screen.getByRole('button', { name: 'Tap again to undo last turn' });
+    expect(armed.className).toContain('danger');
+    expect((await getMatch('m-undo2'))!.legs[0].turns).toHaveLength(1);
+
+    // The second press performs the undo.
+    fireEvent.click(armed);
+    await waitFor(async () =>
+      expect((await getMatch('m-undo2'))!.legs[0].turns).toHaveLength(0),
+    );
+  });
+
+  it('Live disarms the undo confirm when another input arrives', async () => {
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: 'm-undo-disarm',
+        gameType: '501',
+        playerIds: [alice.id],
+        status: 'in_progress',
+        legs: [makeLeg('m-undo-disarm', [makeTurn(alice.id, [S(20), S(20), S(20)], 441)])],
+      }),
+    );
+    render(<Live matchId="m-undo-disarm" />);
+    await screen.findAllByText('Alice');
+
+    fireEvent.click(screen.getByRole('button', { name: '⟲ Undo Last Turn' }));
+    expect(screen.getByRole('button', { name: 'Tap again to undo last turn' })).toBeTruthy();
+
+    // Entering a dart signals the player is scoring, not undoing — disarm.
+    fireEvent.click(screen.getByRole('button', { name: '20' }));
+    expect(screen.queryByRole('button', { name: 'Tap again to undo last turn' })).toBeNull();
+    expect(screen.getByRole('button', { name: '⟲ Undo Last Turn' })).toBeTruthy();
+    expect((await getMatch('m-undo-disarm'))!.legs[0].turns).toHaveLength(1);
+  });
+
+  it('LiveAtc requires a second press to undo the last turn', async () => {
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: 'atc-undo2',
+        gameType: 'AroundTheClock',
+        atcRing: 'single',
+        playerIds: [alice.id],
+        status: 'in_progress',
+        legs: [makeLeg('atc-undo2', [makeTurn(alice.id, [atcHitDart(1)], 1)])],
+      }),
+    );
+    render(<LiveAtc matchId="atc-undo2" />);
+    await screen.findAllByText('Alice');
+
+    fireEvent.click(screen.getByRole('button', { name: '⟲ Undo Last Turn' }));
+    const armed = screen.getByRole('button', { name: 'Tap again to undo last turn' });
+    expect((await getMatch('atc-undo2'))!.legs[0].turns).toHaveLength(1);
+
+    fireEvent.click(armed);
+    await waitFor(async () =>
+      expect((await getMatch('atc-undo2'))!.legs[0].turns).toHaveLength(0),
+    );
+  });
+
   it('Live keeps the darts and shows an error when the turn save fails', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const alice = await addPlayer('Alice');
