@@ -273,14 +273,19 @@ export function LiveAtc({ matchId }: { matchId: string }) {
         })}
       </div>
 
-      {hasWon && (
-        <div className="banner win">{nameOf(turnPlayer)} clears the board! Confirm to win the leg.</div>
-      )}
-
-      <div className="atc-aim">
-        {nameOf(turnPlayer)} — aim for{' '}
-        <strong>{hasWon ? '—' : atcTargetLabel(currentTargetNum, ring)}</strong>
-        {ring === 'progressive' && <span className="atc-hint"> · double +2 · treble +3</span>}
+      {/* Fixed-height slot holding either the aim line or the win banner, so
+          the buttons below never jump when the banner swaps in. */}
+      <div className="status-slot">
+        {hasWon ? (
+          <div className="banner win">
+            {nameOf(turnPlayer)} clears the board! Confirm to win the leg.
+          </div>
+        ) : (
+          <div className="atc-aim">
+            {nameOf(turnPlayer)} — aim for <strong>{atcTargetLabel(currentTargetNum, ring)}</strong>
+            {ring === 'progressive' && <span className="atc-hint"> · double +2 · treble +3</span>}
+          </div>
+        )}
       </div>
 
       <div className="dart-slots">

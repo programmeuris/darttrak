@@ -502,6 +502,18 @@ body {
   font-size: 1.2rem;
 }
 
+/* ---- Live: status slot ---- */
+/* Fixed-height home for the transient status content (bust/win banner,
+   checkout hint, ATC aim line). Sized to the tallest occupant (the banner) so
+   the input buttons below never shift when it appears, disappears, or swaps —
+   mid-turn layout jumps cause mistaps. */
+.status-slot {
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 /* ---- Live: banner ---- */
 .banner {
   border-radius: var(--radius);

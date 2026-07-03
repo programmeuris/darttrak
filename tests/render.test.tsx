@@ -207,6 +207,63 @@ describe('screens render without crashing', () => {
     expect(single.getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('Live keeps the status area mounted when the checkout hint comes and goes', async () => {
+    const alice = await addPlayer('Alice');
+    // Alice sits on 170: a 3-dart checkout exists, so the hint shows at mount.
+    await saveMatch(
+      makeMatch({
+        id: 'm-slot',
+        gameType: '501',
+        playerIds: [alice.id],
+        doubleOut: true,
+        status: 'in_progress',
+        legs: [makeLeg('m-slot', [makeTurn(alice.id, [S(20), S(20), S(20)], 170)])],
+      }),
+    );
+    const { container } = render(<Live matchId="m-slot" />);
+    await screen.findAllByText('Alice');
+
+    expect(container.querySelector('.status-slot')).toBeTruthy();
+    expect(container.querySelector('.checkout-hint')!.textContent).toContain('T20');
+
+    // A missed dart leaves 170 with two darts — no route, so the hint goes,
+    // but the slot keeps holding its space and the numpad doesn't shift.
+    fireEvent.click(screen.getByRole('button', { name: 'Miss' }));
+    expect(container.querySelector('.checkout-hint')).toBeNull();
+    expect(container.querySelector('.status-slot')).toBeTruthy();
+  });
+
+  it('LiveAtc swaps the aim line for the win banner inside the same fixed slot', async () => {
+    const alice = await addPlayer('Alice');
+    // One target left: 20 of 21 already cleared.
+    await saveMatch(
+      makeMatch({
+        id: 'atc-slot',
+        gameType: 'AroundTheClock',
+        atcRing: 'single',
+        playerIds: [alice.id],
+        status: 'in_progress',
+        legs: [
+          makeLeg('atc-slot', [
+            makeTurn(
+              alice.id,
+              Array.from({ length: 20 }, (_, i) => atcHitDart(i + 1)),
+              20,
+            ),
+          ]),
+        ],
+      }),
+    );
+    const { container } = render(<LiveAtc matchId="atc-slot" />);
+    await screen.findAllByText('Alice');
+    expect(container.querySelector('.status-slot .atc-aim')).toBeTruthy();
+
+    // Clearing the board swaps the aim line for the win banner in place.
+    fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
+    expect(container.querySelector('.status-slot .banner.win')).toBeTruthy();
+    expect(container.querySelector('.atc-aim')).toBeNull();
+  });
+
   it('Live ignores a double-tap on Confirm right after a turn is recorded', async () => {
     const alice = await addPlayer('Alice');
     const bob = await addPlayer('Bob');

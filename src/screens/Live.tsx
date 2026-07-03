@@ -289,16 +289,20 @@ export function Live({ matchId }: { matchId: string }) {
         })}
       </div>
 
-      {outcome === 'bust' && <div className="banner bust">BUST — confirm to end turn</div>}
-      {outcome === 'win' && (
-        <div className="banner win">{nameOf(turnPlayer)} checks out! Confirm to win the leg.</div>
-      )}
-
-      {checkout && (
-        <div className="checkout-hint">
-          Checkout: <strong>{checkout.join(' · ')}</strong>
-        </div>
-      )}
+      {/* Fixed-height slot for the bust/win banner or the checkout hint
+          (mutually exclusive), so the numpad below never jumps as they come
+          and go mid-turn. */}
+      <div className="status-slot">
+        {outcome === 'bust' && <div className="banner bust">BUST — confirm to end turn</div>}
+        {outcome === 'win' && (
+          <div className="banner win">{nameOf(turnPlayer)} checks out! Confirm to win the leg.</div>
+        )}
+        {checkout && (
+          <div className="checkout-hint">
+            Checkout: <strong>{checkout.join(' · ')}</strong>
+          </div>
+        )}
+      </div>
 
       <div className="dart-slots">
         {[0, 1, 2].map((i) => (
