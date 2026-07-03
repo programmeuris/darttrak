@@ -54,6 +54,23 @@ const barOpts: ChartOptions<'bar'> = {
   scales: axes(true),
 };
 
+// Options for per-match trend charts whose x-axis is the match number
+// ("Match 1", "Match 2", …): the date moves into the tooltip title, so
+// same-day games don't collapse onto a repeated axis label.
+function matchIndexOpts(points: { label: string }[]): ChartOptions<'line'> {
+  return {
+    ...lineOpts,
+    plugins: {
+      ...lineOpts.plugins,
+      tooltip: {
+        callbacks: {
+          title: (items: TooltipItem<'line'>[]) => points[items[0]?.dataIndex ?? 0]?.label ?? '',
+        },
+      },
+    },
+  };
+}
+
 // Per-variant ATC chart: Hit % on the left axis (0–100), throws-to-finish on the
 // right axis (auto-scaled), so both trends read off one graph.
 function atcVariantOpts(points: { label: string; cleared: boolean }[]): ChartOptions<'line'> {
@@ -293,20 +310,9 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
   const o = computePlayerOverview(matches, playerId);
   const avg = averagePerMatch(matches, playerId);
   const dist = scoreDistribution(matches, playerId);
-  // X-axis is the match number (1, 2, …); the date moves into the tooltip so
-  // same-day games don't collapse onto a repeated label.
   const lineData: ChartData<'line'> = {
     labels: avg.map((_, i) => `Match ${i + 1}`),
     datasets: [line('3-Dart Avg', avg.map((p) => round(p.average)), ACCENT, true)],
-  };
-  const avgOpts: ChartOptions<'line'> = {
-    ...lineOpts,
-    plugins: {
-      ...lineOpts.plugins,
-      tooltip: {
-        callbacks: { title: (items: TooltipItem<'line'>[]) => avg[items[0]?.dataIndex ?? 0]?.label ?? '' },
-      },
-    },
   };
   const barData: ChartData<'bar'> = {
     labels: dist.labels,
@@ -329,7 +335,7 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
         <p className="muted">Win rate counts competitive games only (excludes solo practice).</p>
       </section>
       <ChartCard title="Average Per Match">
-        <Line data={lineData} options={avgOpts} />
+        <Line data={lineData} options={matchIndexOpts(avg)} />
       </ChartCard>
       <ChartCard title="Score Distribution">
         <Bar data={barData} options={barOpts} />
@@ -341,9 +347,8 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
 function Consistency({ matches, playerId }: { matches: Match[]; playerId: string }) {
   const s = consistencyStats(matches, playerId);
   if (s.visits === 0) return <Empty text="No scoring visits recorded yet." />;
-  const labels = s.perMatch.map((p) => p.label);
   const data: ChartData<'line'> = {
-    labels,
+    labels: s.perMatch.map((_, i) => `Match ${i + 1}`),
     datasets: [
       line('Avg Visit', s.perMatch.map((p) => round(p.average)), ACCENT),
       {
@@ -378,7 +383,7 @@ function Consistency({ matches, playerId }: { matches: Match[]; playerId: string
         </p>
       </section>
       <ChartCard title="Scoring Spread Per Match" subtitle="Lower spread (shaded band) means steadier scoring.">
-        <Line data={data} options={lineOpts} />
+        <Line data={data} options={matchIndexOpts(s.perMatch)} />
       </ChartCard>
     </>
   );
@@ -388,7 +393,7 @@ function Finishing({ matches, playerId }: { matches: Match[]; playerId: string }
   const s = finishingStats(matches, playerId);
   if (s.opportunities === 0) return <Empty text="No checkout opportunities recorded yet." />;
   const lineData: ChartData<'line'> = {
-    labels: s.perMatch.map((p) => p.label),
+    labels: s.perMatch.map((_, i) => `Match ${i + 1}`),
     datasets: [line('Checkout %', s.perMatch.map((p) => round(p.checkoutPercent)), GREEN, true)],
   };
   const barData: ChartData<'bar'> = {
@@ -412,7 +417,7 @@ function Finishing({ matches, playerId }: { matches: Match[]; playerId: string }
         </p>
       </section>
       <ChartCard title="Checkout % Per Match">
-        <Line data={lineData} options={lineOpts} />
+        <Line data={lineData} options={matchIndexOpts(s.perMatch)} />
       </ChartCard>
       <ChartCard title="Checkouts By Finish Size">
         <Bar data={barData} options={barOpts} />
@@ -425,7 +430,7 @@ function Scoring({ matches, playerId }: { matches: Match[]; playerId: string }) 
   const s = scoringStats(matches, playerId);
   if (s.threeDartAverage === 0) return <Empty text="No scoring data recorded yet." />;
   const data: ChartData<'line'> = {
-    labels: s.perMatch.map((p) => p.label),
+    labels: s.perMatch.map((_, i) => `Match ${i + 1}`),
     datasets: [
       line('3-Dart Avg', s.perMatch.map((p) => round(p.average)), ACCENT),
       line('First-9 Avg', s.perMatch.map((p) => round(p.firstNine)), BLUE),
@@ -448,7 +453,7 @@ function Scoring({ matches, playerId }: { matches: Match[]; playerId: string }) 
         <p className="muted">Ton+ rate = share of visits worth 100 or more (busts excluded).</p>
       </section>
       <ChartCard title="3-Dart vs First-9 Average" subtitle="First-9 is the pure scoring phase before finishing.">
-        <Line data={data} options={lineOpts} />
+        <Line data={data} options={matchIndexOpts(s.perMatch)} />
       </ChartCard>
     </>
   );
