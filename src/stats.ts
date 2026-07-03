@@ -1,6 +1,7 @@
 import type { Match, Leg, Turn } from './types';
 import {
   calculateAverage,
+  calculateHighestTurn,
   count180s,
   bestCheckout,
   isX01,
@@ -118,6 +119,51 @@ export function scoreDistribution(
     }
   }
   return { labels: BUCKETS.map((b) => b.label), counts };
+}
+
+export interface X01Best {
+  value: number;
+  date: number; // date of the match in which the record was set
+}
+
+export interface X01PersonalBests {
+  bestMatchAverage: X01Best | null;
+  bestCheckout: X01Best | null;
+  fewestDartsLeg: X01Best | null; // fewest darts to win a leg
+  highestTurn: X01Best | null;
+}
+
+/**
+ * Lifetime x01 records with the date each was first set — recent record
+ * dates are themselves a progression signal.
+ */
+export function x01PersonalBests(matches: Match[], playerId: string): X01PersonalBests {
+  const played = completedMatchesFor(matches, playerId).sort((a, b) => a.date - b.date);
+  let bestAvg: X01Best | null = null;
+  let bestCo: X01Best | null = null;
+  let fewest: X01Best | null = null;
+  let highTurn: X01Best | null = null;
+  for (const m of played) {
+    const avg = calculateAverage(m.legs, playerId);
+    if (avg > 0 && (!bestAvg || avg > bestAvg.value)) bestAvg = { value: avg, date: m.date };
+    const co = bestCheckout(m.legs, playerId);
+    if (co > 0 && (!bestCo || co > bestCo.value)) bestCo = { value: co, date: m.date };
+    const high = calculateHighestTurn(m.legs, playerId);
+    if (high > 0 && (!highTurn || high > highTurn.value)) highTurn = { value: high, date: m.date };
+    for (const leg of m.legs) {
+      if (leg.winnerId !== playerId) continue;
+      const darts = leg.turns
+        .filter((t) => t.playerId === playerId)
+        .reduce((a, t) => a + t.darts.length, 0);
+      if (darts > 0 && (!fewest || darts < fewest.value)) fewest = { value: darts, date: m.date };
+    }
+  }
+  return {
+    bestMatchAverage: bestAvg,
+    bestCheckout: bestCo,
+    fewestDartsLeg: fewest,
+    highestTurn: highTurn,
+  };
 }
 
 /** Flatten all turns by a player in a single match (for breakdowns). */

@@ -682,6 +682,14 @@ body {
   font-weight: 800;
   color: var(--accent);
 }
+/* Trend deltas: green = improving, red = declining (direction-aware, so a
+   falling darts-per-leg shows green). */
+.stat-value.good {
+  color: var(--success-text);
+}
+.stat-value.bad {
+  color: var(--accent-text);
+}
 .stat-label {
   font-size: 0.75rem;
   color: var(--muted);
@@ -902,6 +910,15 @@ body {
 }
 
 /* ---- ATC hit % by area ---- */
+.area-table .trend.good {
+  color: var(--success-text);
+}
+.area-table .trend.bad {
+  color: var(--accent-text);
+}
+.area-table abbr {
+  text-decoration: none;
+}
 .scope-row {
   margin: 4px 0 12px;
 }

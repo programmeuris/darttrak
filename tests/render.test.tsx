@@ -729,6 +729,37 @@ describe('player profiles', () => {
     );
   });
 
+  it('PlayerStats ATC shows a direction-aware trend row once enough legs exist', async () => {
+    const alice = await addPlayer('Alice');
+    // Six single-variant games: three all-miss legs, then three all-hit legs
+    // → hit % trend is +100 over last-3-vs-previous-3 and reads as improving.
+    for (let i = 0; i < 6; i++) {
+      const dart = i < 3 ? atcMissDart(1) : atcHitDart(1);
+      await saveMatch(
+        makeMatch({
+          id: `atc-trend-${i}`,
+          date: 1000 + i,
+          gameType: 'AroundTheClock',
+          atcRing: 'single',
+          playerIds: [alice.id],
+          status: 'completed',
+          winnerId: alice.id,
+          legs: [makeLeg(`atc-trend-${i}`, [makeTurn(alice.id, [dart], dart.score)])],
+        }),
+      );
+    }
+    const { container } = render(<PlayerStats playerId={alice.id} />);
+    fireEvent.click(await screen.findByText('Around the Clock'));
+
+    const hitCell = screen.getByText('Hit % · last 3 vs prev 3').previousElementSibling!;
+    expect(hitCell.textContent).toBe('+100.0%');
+    expect(hitCell.className).toContain('good');
+    // No cleared legs → no darts-per-leg trend, shown as an em dash.
+    expect(screen.getByText('Darts / leg trend')).toBeTruthy();
+    // The area table gains the ± improvement column.
+    expect(container.querySelector('.area-table .trend')).toBeTruthy();
+  });
+
   it('PlayerStats ATC area table sorts by area and hit %, both directions', async () => {
     const alice = await addPlayer('Alice');
     // One single-variant game whose targets have distinct hit rates so numeric
