@@ -45,6 +45,12 @@ Two reasons:
   yourself; once more than 20 games are in scope, an All / Last-20 toggle narrows
   them further. Each player's last-viewed tab, variant, and scope toggles are
   remembered on the device, and New Match remembers the last game configuration.
+- **Progression tracking**: rolling-average trend lines overlaid on the main
+  charts, direction-aware trend deltas (your most recent games vs the games
+  before them, green when improving), dated personal bests (fastest leg, best
+  average, best checkout, best visit / best leg hit %), and a per-area ±
+  column showing where your Around the Clock hit % improved between the
+  earlier and recent halves of your games.
 - **Backup & restore**: export all data to JSON and re-import it (your only
   backup). Imports are validated up front and rejected whole if the file is
   corrupt or from a newer app version — importing the wrong file can't wipe

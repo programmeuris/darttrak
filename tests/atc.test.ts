@@ -15,6 +15,8 @@ import {
   atcProgressiveSteps,
   atcSeriesByVariant,
   atcTargetStats,
+  atcTargetTrends,
+  atcPersonalBests,
   atcVariantMatches,
 } from '../src/atc';
 import {
@@ -266,6 +268,68 @@ describe('analytics by variant', () => {
     const series = atcSeriesByVariant([m1, m3], A);
     expect(series.find((s) => s.ring === 'single')!.points.map((p) => p.cleared)).toEqual([true]);
     expect(series.find((s) => s.ring === 'double')!.points.map((p) => p.cleared)).toEqual([false]);
+  });
+
+  it('tracks personal bests over cleared legs only, dated to the record match', () => {
+    // A clears m1 (21 darts, 100% hit rate) at date 1000. A later, sloppier
+    // clear (24 darts, 21/24 hits) must not displace either record.
+    const slow = makeLeg('slow', [
+      makeTurn(A, [atcMissDart(1), atcMissDart(1), atcMissDart(1)], 0),
+      ...m1.legs[0].turns,
+    ], A);
+    const m4 = makeMatch({
+      id: 'm4',
+      date: 4000,
+      gameType: 'AroundTheClock',
+      atcRing: 'single',
+      playerIds: [A],
+      winnerId: A,
+      legs: [slow],
+    });
+    const pb = atcPersonalBests([m4, m1], A, 'single');
+    expect(pb.fewestDarts).toEqual({ value: 21, date: 1000 });
+    expect(pb.bestLegHitRate!.value).toBe(100);
+    expect(pb.bestLegHitRate!.date).toBe(1000);
+
+    // A's uncleared leg in m3 (2 darts) never counts as an attempt.
+    const doubles = atcPersonalBests([m3], A, 'double');
+    expect(doubles.fewestDarts).toBeNull();
+    expect(doubles.bestLegHitRate).toBeNull();
+  });
+
+  it('reports per-area improvement between the earlier and recent halves', () => {
+    // Every dart stays on target 1: misses first, exactly one hit last (a hit
+    // advances the live target, so more hits would attribute darts to 2, 3…).
+    const gameOn1 = (id: string, date: number, misses: number) =>
+      makeMatch({
+        id,
+        date,
+        gameType: 'AroundTheClock',
+        atcRing: 'single',
+        playerIds: [A],
+        winnerId: A,
+        legs: [
+          makeLeg(id, [
+            makeTurn(
+              A,
+              [...Array.from({ length: misses }, () => atcMissDart(1)), atcHitDart(1)],
+              1,
+            ),
+          ]),
+        ],
+      });
+    // Early half: 1 hit per 6 darts (2/12). Recent half: 1 per 3 (2/6).
+    const early = [gameOn1('e1', 100, 5), gameOn1('e2', 200, 5)];
+    const recent = [gameOn1('r1', 300, 2), gameOn1('r2', 400, 2)];
+
+    const trends = atcTargetTrends([...early, ...recent], A, 'single');
+    const one = trends.find((t) => t.target === 1)!;
+    expect(one.delta).toBeCloseTo((2 / 6 - 2 / 12) * 100, 5);
+    // Targets never attempted in both halves report null, not a fake 0.
+    expect(trends.find((t) => t.target === 20)!.delta).toBeNull();
+
+    // A single game can't be split into halves.
+    expect(atcTargetTrends([early[0]], A, 'single').every((t) => t.delta === null)).toBe(true);
   });
 });
 

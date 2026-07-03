@@ -4,8 +4,9 @@ import {
   averagePerMatch,
   scoreDistribution,
   playerTurnsInMatch,
+  x01PersonalBests,
 } from '../src/stats';
-import { S, T, makeTurn, makeLeg, makeMatch } from './helpers';
+import { S, T, D, makeTurn, makeLeg, makeMatch } from './helpers';
 import type { Match } from '../src/types';
 
 const A = 'A';
@@ -99,6 +100,47 @@ describe('playerTurnsInMatch', () => {
   it('returns only that player’s turns', () => {
     expect(playerTurnsInMatch(mA, A)).toHaveLength(1);
     expect(playerTurnsInMatch(mA, B)).toHaveLength(0);
+  });
+});
+
+describe('x01PersonalBests', () => {
+  it('dates each record to the match it was first set in', () => {
+    // mC: A wins a 301 leg in 6 darts — 180 then a 121 checkout (T20 T11 D14).
+    const mC: Match = makeMatch({
+      id: 'mC',
+      date: 5000,
+      gameType: '301',
+      playerIds: [A],
+      winnerId: A,
+      legs: [
+        makeLeg(
+          'mC',
+          [
+            makeTurn(A, [T(20), T(20), T(20)], 121),
+            makeTurn(A, [T(20), T(11), D(14)], 0),
+          ],
+          A,
+        ),
+      ],
+    });
+    const pb = x01PersonalBests([mA, mB, mC], A);
+    // Best visit is the 180 — first thrown in mB, not displaced by mC's 180.
+    expect(pb.highestTurn).toEqual({ value: 180, date: 2000 });
+    // mA's fixture leg is marked won after a single 3-dart visit, so it holds
+    // the fastest-leg record; mC's genuine 6-dart finish doesn't displace it.
+    expect(pb.fewestDartsLeg).toEqual({ value: 3, date: 1000 });
+    expect(pb.bestCheckout).toEqual({ value: 121, date: 5000 });
+    // mB's single 180 visit is a 180.0 match average — still the record
+    // (mC averages 150.5), so the date stays 2000.
+    expect(pb.bestMatchAverage).toEqual({ value: 180, date: 2000 });
+  });
+
+  it('returns nulls with no completed data', () => {
+    const pb = x01PersonalBests([], A);
+    expect(pb.bestMatchAverage).toBeNull();
+    expect(pb.bestCheckout).toBeNull();
+    expect(pb.fewestDartsLeg).toBeNull();
+    expect(pb.highestTurn).toBeNull();
   });
 });
 

@@ -7,13 +7,16 @@ import { toast } from '../toast';
 import { readPref, writePref } from '../prefs';
 import { Header, StatCell } from '../components/Header';
 import { getPlayers, getAllMatches } from '../db';
-import { computePlayerOverview, averagePerMatch, scoreDistribution } from '../stats';
+import { computePlayerOverview, averagePerMatch, scoreDistribution, x01PersonalBests } from '../stats';
 import { consistencyStats, finishingStats, scoringStats, headToHead } from '../analysis';
+import { rollingMean, trendDelta, type TrendDelta } from '../progression';
 import {
   ATC_RING_ORDER,
   atcStatsByVariant,
   atcSeriesByVariant,
   atcTargetStats,
+  atcTargetTrends,
+  atcPersonalBests,
   atcVariantMatches,
   atcRingLabel,
 } from '../atc';
@@ -34,6 +37,10 @@ const RING_COLORS: Record<AtcRing, string> = {
 };
 
 const round = (n: number) => Number(n.toFixed(1));
+const shortDate = (d: number) => new Date(d).toLocaleDateString();
+
+// Trailing window for the smoothed trend line overlaid on the raw series.
+const ROLLING_WINDOW = 5;
 
 function axes(yFrom0 = true) {
   return {
@@ -81,8 +88,14 @@ function atcVariantOpts(points: { label: string; cleared: boolean }[]): ChartOpt
     plugins: {
       // Dataset `order` flips the legend and tooltip listing along with the
       // draw order, so both are pinned back to dataset order (Hit % first).
+      // The rolling-average overlays are hidden from the legend — four
+      // entries is clutter; they're self-explanatory in the tooltip.
       legend: {
-        labels: { color: TEXT, sort: (a, b) => (a.datasetIndex ?? 0) - (b.datasetIndex ?? 0) },
+        labels: {
+          color: TEXT,
+          sort: (a, b) => (a.datasetIndex ?? 0) - (b.datasetIndex ?? 0),
+          filter: (item) => !(item.text ?? '').includes('avg'),
+        },
       },
       tooltip: {
         itemSort: (a: TooltipItem<'line'>, b: TooltipItem<'line'>) =>
@@ -92,9 +105,13 @@ function atcVariantOpts(points: { label: string; cleared: boolean }[]): ChartOpt
           label: (ctx: TooltipItem<'line'>) => {
             const isDarts = ctx.dataset.yAxisID === 'yDarts';
             // An uncleared game ended before the player finished the board, so
-            // its darts count is truncated — flag it rather than let it read as
-            // a genuinely quick game.
-            const suffix = isDarts && !points[ctx.dataIndex]?.cleared ? ' (unfinished)' : '';
+            // its darts count is truncated — flag it rather than let it read
+            // as a genuinely quick game. Raw series only: the rolling average
+            // already excludes uncleared legs.
+            const suffix =
+              ctx.dataset.label === 'Darts / leg' && !points[ctx.dataIndex]?.cleared
+                ? ' (unfinished)'
+                : '';
             return `${ctx.dataset.label}: ${ctx.parsed.y}${isDarts ? ' darts' : '%'}${suffix}`;
           },
         },
@@ -133,6 +150,53 @@ function line(label: string, data: (number | null)[], color: string, fill = fals
     pointRadius: 3,
     spanGaps: true,
   };
+}
+
+// Smoothed companion to a raw series: thick, point-free, drawn beneath the
+// raw line (higher `order` draws below), starting once a full window exists.
+function rollingLine(
+  label: string,
+  data: (number | null)[],
+  color: string,
+  yAxisID?: string,
+): ChartDataset<'line'> {
+  return {
+    label,
+    data: data.map((v) => (v === null ? null : round(v))),
+    borderColor: color,
+    backgroundColor: color,
+    borderWidth: 3,
+    pointRadius: 0,
+    tension: 0.35,
+    spanGaps: true,
+    order: 3,
+    ...(yAxisID ? { yAxisID } : {}),
+  };
+}
+
+// One cell of the "recent window vs the window before" comparison.
+function TrendCell({
+  label,
+  trend,
+  goodWhen,
+  unit = '',
+}: {
+  label: string;
+  trend: TrendDelta | null;
+  goodWhen: 'up' | 'down';
+  unit?: string;
+}) {
+  if (!trend) return <StatCell value="—" label={`${label} trend`} />;
+  const d = round(trend.delta);
+  const cls = d === 0 ? '' : (goodWhen === 'up' ? d > 0 : d < 0) ? 'good' : 'bad';
+  return (
+    <div className="stat-cell">
+      <div className={`stat-value ${cls}`}>{`${d > 0 ? '+' : ''}${d.toFixed(1)}${unit}`}</div>
+      <div className="stat-label">
+        {label} · last {trend.window} vs prev {trend.window}
+      </div>
+    </div>
+  );
 }
 
 function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
@@ -310,14 +374,29 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
   const o = computePlayerOverview(matches, playerId);
   const avg = averagePerMatch(matches, playerId);
   const dist = scoreDistribution(matches, playerId);
+  const pb = x01PersonalBests(matches, playerId);
+  const avgTrend = trendDelta(avg.map((p) => p.average));
+  const checkoutTrend = trendDelta(
+    finishingStats(matches, playerId).perMatch.map((p) => p.checkoutPercent),
+  );
+  const avgValues = avg.map((p) => p.average);
   const lineData: ChartData<'line'> = {
     labels: avg.map((_, i) => `Match ${i + 1}`),
-    datasets: [line('3-Dart Avg', avg.map((p) => round(p.average)), ACCENT, true)],
+    datasets: [
+      line('3-Dart Avg', avg.map((p) => round(p.average)), ACCENT, true),
+      ...(avg.length >= ROLLING_WINDOW
+        ? [rollingLine(`${ROLLING_WINDOW}-match avg`, rollingMean(avgValues, ROLLING_WINDOW), BLUE)]
+        : []),
+    ],
   };
   const barData: ChartData<'bar'> = {
     labels: dist.labels,
     datasets: [{ label: 'Visits', data: dist.counts, backgroundColor: GREEN }],
   };
+  // Personal-best cells carry the date the record was set — a cluster of
+  // recent dates is itself a progression signal.
+  const withDate = (label: string, best: { date: number } | null) =>
+    best ? `${label} · ${shortDate(best.date)}` : label;
   return (
     <>
       <section className="card">
@@ -327,14 +406,47 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
             [String(o.matchesWon), 'Won'],
             [o.competitivePlayed === 0 ? '—' : `${o.winRate.toFixed(0)}%`, 'Win Rate'],
             [o.overallAverage.toFixed(1), 'Overall Avg'],
-            [o.bestMatchAverage.toFixed(1), 'Best Match Avg'],
+            [
+              o.bestMatchAverage.toFixed(1),
+              withDate('Best Match Avg', pb.bestMatchAverage),
+            ],
             [String(o.total180s), '180s'],
-            [o.bestCheckout > 0 ? String(o.bestCheckout) : '—', 'Best Checkout'],
+            [
+              o.bestCheckout > 0 ? String(o.bestCheckout) : '—',
+              withDate('Best Checkout', pb.bestCheckout),
+            ],
+            [
+              pb.fewestDartsLeg ? String(pb.fewestDartsLeg.value) : '—',
+              withDate('Fastest Leg (darts)', pb.fewestDartsLeg),
+            ],
+            [
+              pb.highestTurn ? String(pb.highestTurn.value) : '—',
+              withDate('Best Visit', pb.highestTurn),
+            ],
           ]}
         />
         <p className="muted">Win rate counts competitive games only (excludes solo practice).</p>
       </section>
-      <ChartCard title="Average Per Match">
+      {(avgTrend || checkoutTrend) && (
+        <section className="card">
+          <h2 className="card-title">Trend</h2>
+          <div className="stat-grid">
+            <TrendCell label="3-Dart Avg" trend={avgTrend} goodWhen="up" />
+            <TrendCell label="Checkout %" trend={checkoutTrend} goodWhen="up" unit="%" />
+          </div>
+          <p className="muted">
+            Your most recent matches against the ones before them — green means improving.
+          </p>
+        </section>
+      )}
+      <ChartCard
+        title="Average Per Match"
+        subtitle={
+          avg.length >= ROLLING_WINDOW
+            ? `The smooth line is the ${ROLLING_WINDOW}-match rolling average — your form through the noise.`
+            : undefined
+        }
+      >
         <Line data={lineData} options={matchIndexOpts(avg)} />
       </ChartCard>
       <ChartCard title="Score Distribution">
@@ -550,6 +662,18 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
   // Each variant is indexed by its own game count so its chart starts at game 1.
   const points = atcSeriesByVariant(scoped, playerId).find((s) => s.ring === active.ring)?.points ?? [];
   const targets = atcTargetStats(scoped, playerId, active.ring);
+  const targetTrends = new Map(
+    atcTargetTrends(scoped, playerId, active.ring).map((t) => [t.target, t.delta]),
+  );
+  // Trend and rolling lines follow the chart's scope; the darts metric only
+  // counts cleared legs — an uncleared leg's dart count is truncated, so it
+  // would drag the "throws to finish" trend down for the wrong reason.
+  const hitValues = points.map((p) => p.hitRate);
+  const clearedDarts = points.map((p) => (p.cleared ? p.darts : null));
+  const hitTrend = trendDelta(hitValues);
+  const dartsTrend = trendDelta(clearedDarts.filter((v): v is number => v !== null));
+  // Personal bests stay all-time for the variant, like the stat grid.
+  const pb = atcPersonalBests(matches, playerId, active.ring);
   const gamesNoun = soloScoped ? 'solo games' : 'games';
   const scopeNote =
     canScope && recentOnly
@@ -587,6 +711,23 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         // two lines cross, instead of hiding under the Hit % points.
         order: 1,
       },
+      ...(points.length >= ROLLING_WINDOW
+        ? [
+            rollingLine(
+              `Hit % (${ROLLING_WINDOW}-leg avg)`,
+              rollingMean(hitValues, ROLLING_WINDOW),
+              BLUE,
+              'y',
+            ),
+            // Cleared legs only; needs 3 of the last 5 to plot a point.
+            rollingLine(
+              `Darts (${ROLLING_WINDOW}-leg avg)`,
+              rollingMean(clearedDarts, ROLLING_WINDOW, 3),
+              AMBER,
+              'yDarts',
+            ),
+          ]
+        : []),
     ],
   };
 
@@ -621,7 +762,16 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             [String(active.competitivePlayed), `Played (${active.played} total)`],
             [active.competitivePlayed === 0 ? '—' : `${active.winRate.toFixed(0)}%`, 'Win Rate'],
             [`${active.hitRate.toFixed(0)}%`, 'Hit Rate'],
-            [active.fewestToClear > 0 ? String(active.fewestToClear) : '—', 'Fewest Darts'],
+            [
+              pb.fewestDarts ? String(pb.fewestDarts.value) : '—',
+              pb.fewestDarts ? `Fewest Darts · ${shortDate(pb.fewestDarts.date)}` : 'Fewest Darts',
+            ],
+            [
+              pb.bestLegHitRate ? `${pb.bestLegHitRate.value.toFixed(0)}%` : '—',
+              pb.bestLegHitRate
+                ? `Best Leg Hit % · ${shortDate(pb.bestLegHitRate.date)}`
+                : 'Best Leg Hit %',
+            ],
             [active.avgDartsToClear > 0 ? active.avgDartsToClear.toFixed(0) : '—', 'Avg Darts'],
           ]}
         />
@@ -661,10 +811,18 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             </button>
           </div>
         )}
+        {(hitTrend || dartsTrend) && (
+          <div className="stat-grid">
+            <TrendCell label="Hit %" trend={hitTrend} goodWhen="up" unit="%" />
+            <TrendCell label="Darts / leg" trend={dartsTrend} goodWhen="down" />
+          </div>
+        )}
         {points.length > 0 && (
           <>
             <p className="muted">
               Hit % and throws to finish, per leg.
+              {points.length >= ROLLING_WINDOW &&
+                ` The smooth lines are ${ROLLING_WINDOW}-leg rolling averages.`}
               {points.some((p) => !p.cleared) &&
                 ' Red points mark legs where the board wasn’t cleared.'}
             </p>
@@ -673,7 +831,12 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             </div>
           </>
         )}
-        <AtcTargets targets={targets} color={RING_COLORS[active.ring]} scopeNote={scopeNote} />
+        <AtcTargets
+          targets={targets}
+          trends={targetTrends}
+          color={RING_COLORS[active.ring]}
+          scopeNote={scopeNote}
+        />
       </section>
     </>
   );
@@ -687,10 +850,12 @@ type AreaSortDir = 'asc' | 'desc';
 
 function AtcTargets({
   targets,
+  trends,
   color,
   scopeNote,
 }: {
   targets: AtcTargetStat[];
+  trends: Map<number, number | null>;
   color: string;
   scopeNote: string;
 }) {
@@ -742,32 +907,51 @@ function AtcTargets({
               </button>
             </th>
             <th className="num">Hits</th>
+            <th className="num">
+              <abbr title="Hit % change: recent half of the games vs the earlier half">±</abbr>
+            </th>
           </tr>
         </thead>
         <tbody>
-          {sorted.map((t) => (
-            <tr key={t.target} className={t.darts === 0 ? 'no-data' : ''}>
-              <td className="area-name">{t.label}</td>
-              <td className="num">
-                {t.darts === 0 ? (
-                  '—'
-                ) : (
-                  <span className="area-bar-cell">
-                    <span className="area-bar-track">
-                      <span
-                        className="area-bar-fill"
-                        style={{ width: `${t.hitRate}%`, background: color }}
-                      />
+          {sorted.map((t) => {
+            const delta = trends.get(t.target) ?? null;
+            return (
+              <tr key={t.target} className={t.darts === 0 ? 'no-data' : ''}>
+                <td className="area-name">{t.label}</td>
+                <td className="num">
+                  {t.darts === 0 ? (
+                    '—'
+                  ) : (
+                    <span className="area-bar-cell">
+                      <span className="area-bar-track">
+                        <span
+                          className="area-bar-fill"
+                          style={{ width: `${t.hitRate}%`, background: color }}
+                        />
+                      </span>
+                      <span className="area-pct">{t.hitRate.toFixed(0)}%</span>
                     </span>
-                    <span className="area-pct">{t.hitRate.toFixed(0)}%</span>
-                  </span>
-                )}
-              </td>
-              <td className="num">{t.darts === 0 ? '—' : `${t.hits}/${t.darts}`}</td>
-            </tr>
-          ))}
+                  )}
+                </td>
+                <td className="num">{t.darts === 0 ? '—' : `${t.hits}/${t.darts}`}</td>
+                <td
+                  className={`num trend ${
+                    delta === null || Math.round(delta) === 0 ? '' : delta > 0 ? 'good' : 'bad'
+                  }`}
+                >
+                  {delta === null
+                    ? '—'
+                    : `${delta > 0 ? '▲' : delta < 0 ? '▼' : ''}${Math.abs(delta).toFixed(0)}`}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+      <p className="muted">
+        ± compares each area's hit % in the recent half of those games with the earlier half
+        (shown once both halves have enough darts).
+      </p>
     </>
   );
 }

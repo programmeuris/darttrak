@@ -256,6 +256,70 @@ export interface AtcVariantSeries {
   points: { date: number; label: string; hitRate: number; darts: number; cleared: boolean }[];
 }
 
+export interface AtcBest {
+  value: number;
+  date: number; // date of the match in which the record was set
+}
+
+export interface AtcPersonalBests {
+  fewestDarts: AtcBest | null; // fewest darts to clear the board
+  bestLegHitRate: AtcBest | null; // best hit % over a single cleared leg
+}
+
+/**
+ * Personal bests for one variant, with the date each record was first set.
+ * Only cleared legs count — they're the complete, comparable attempts (an
+ * abandoned two-dart leg could otherwise "hold" a 100% hit-rate record).
+ */
+export function atcPersonalBests(
+  matches: Match[],
+  playerId: string,
+  ring: AtcRing,
+): AtcPersonalBests {
+  let fewest: AtcBest | null = null;
+  let bestRate: AtcBest | null = null;
+  for (const m of atcVariantMatches(matches, playerId, ring)) {
+    for (const leg of m.legs) {
+      if (leg.winnerId !== playerId) continue;
+      const darts = playerDartsInLeg(leg, playerId);
+      if (darts === 0) continue;
+      if (!fewest || darts < fewest.value) fewest = { value: darts, date: m.date };
+      const rate = atcHitRate([leg], playerId);
+      if (!bestRate || rate > bestRate.value) bestRate = { value: rate, date: m.date };
+    }
+  }
+  return { fewestDarts: fewest, bestLegHitRate: bestRate };
+}
+
+export interface AtcTargetTrend {
+  target: number;
+  delta: number | null; // recent-half hit % minus earlier-half; null = not enough data
+}
+
+/**
+ * Per-area improvement: hit % over the recent half of the variant's games
+ * minus the earlier half, per target. Requires `minDarts` attempts at the
+ * target in BOTH halves — a delta computed from a handful of darts is noise,
+ * so those show null instead. Returned in sequence order.
+ */
+export function atcTargetTrends(
+  matches: Match[],
+  playerId: string,
+  ring: AtcRing,
+  minDarts = 5,
+): AtcTargetTrend[] {
+  const ms = atcVariantMatches(matches, playerId, ring);
+  const half = Math.floor(ms.length / 2);
+  const early = half >= 1 ? atcTargetStats(ms.slice(0, half), playerId, ring) : null;
+  const recent = half >= 1 ? atcTargetStats(ms.slice(half), playerId, ring) : null;
+  return ATC_SEQUENCE.map((target, i) => {
+    const e = early?.[i];
+    const r = recent?.[i];
+    const enough = e && r && e.darts >= minDarts && r.darts >= minDarts;
+    return { target, delta: enough ? r.hitRate - e.hitRate : null };
+  });
+}
+
 /**
  * Per-leg series split by variant, each indexed by its own leg count rather
  * than a shared date axis. This lets the chart align every variant at leg 1
