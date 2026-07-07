@@ -152,8 +152,10 @@ function line(label: string, data: (number | null)[], color: string, fill = fals
   };
 }
 
-// Smoothed companion to a raw series: thick, point-free, drawn beneath the
-// raw line (higher `order` draws below), starting once a full window exists.
+// Smoothed companion to a raw series. One styling rule across every chart:
+// the metric's colour is shared, raw data is a solid line with points, the
+// rolling average is DOTTED, point-free, and drawn beneath the raw line
+// (higher `order` draws below), starting once a full window exists.
 function rollingLine(
   label: string,
   data: (number | null)[],
@@ -166,6 +168,7 @@ function rollingLine(
     borderColor: color,
     backgroundColor: color,
     borderWidth: 3,
+    borderDash: [3, 5],
     pointRadius: 0,
     tension: 0.35,
     spanGaps: true,
@@ -385,7 +388,13 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
     datasets: [
       line('3-Dart Avg', avg.map((p) => round(p.average)), ACCENT, true),
       ...(avg.length >= ROLLING_WINDOW
-        ? [rollingLine(`${ROLLING_WINDOW}-match avg`, rollingMean(avgValues, ROLLING_WINDOW), BLUE)]
+        ? [
+            rollingLine(
+              `${ROLLING_WINDOW}-match avg`,
+              rollingMean(avgValues, ROLLING_WINDOW),
+              ACCENT,
+            ),
+          ]
         : []),
     ],
   };
@@ -443,7 +452,7 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
         title="Average Per Match"
         subtitle={
           avg.length >= ROLLING_WINDOW
-            ? `The smooth line is the ${ROLLING_WINDOW}-match rolling average — your form through the noise.`
+            ? `The dotted line is the ${ROLLING_WINDOW}-match rolling average — your form through the noise.`
             : undefined
         }
       >
@@ -703,7 +712,6 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         // so their darts count isn't a real throws-to-finish figure.
         pointBackgroundColor: points.map((p) => (p.cleared ? AMBER : ACCENT)),
         pointBorderColor: points.map((p) => (p.cleared ? AMBER : ACCENT)),
-        borderDash: [5, 4],
         tension: 0.25,
         pointRadius: 3,
         yAxisID: 'yDarts',
@@ -822,7 +830,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
             <p className="muted">
               Hit % and throws to finish, per leg.
               {points.length >= ROLLING_WINDOW &&
-                ` The smooth lines are ${ROLLING_WINDOW}-leg rolling averages.`}
+                ` The dotted lines are ${ROLLING_WINDOW}-leg rolling averages.`}
               {points.some((p) => !p.cleared) &&
                 ' Red points mark legs where the board wasn’t cleared.'}
             </p>
