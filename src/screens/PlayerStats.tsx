@@ -154,8 +154,8 @@ function line(label: string, data: (number | null)[], color: string, fill = fals
 
 // Smoothed companion to a raw series. One styling rule across every chart:
 // the metric's colour is shared, raw data is a solid line with points, the
-// rolling average is DOTTED, point-free, and drawn beneath the raw line
-// (higher `order` draws below), starting once a full window exists.
+// rolling average is DOTTED, point-free, and drawn in front of the raw lines
+// (lower `order` draws on top), starting once a full window exists.
 function rollingLine(
   label: string,
   data: (number | null)[],
@@ -172,7 +172,7 @@ function rollingLine(
     pointRadius: 0,
     tension: 0.35,
     spanGaps: true,
-    order: 3,
+    order: 1,
     ...(yAxisID ? { yAxisID } : {}),
   };
 }
@@ -386,7 +386,9 @@ function Overview({ matches, playerId }: { matches: Match[]; playerId: string })
   const lineData: ChartData<'line'> = {
     labels: avg.map((_, i) => `Match ${i + 1}`),
     datasets: [
-      line('3-Dart Avg', avg.map((p) => round(p.average)), ACCENT, true),
+      // Explicit order keeps the raw line beneath the dotted rolling average
+      // (lower order draws on top).
+      { ...line('3-Dart Avg', avg.map((p) => round(p.average)), ACCENT, true), order: 2 },
       ...(avg.length >= ROLLING_WINDOW
         ? [
             rollingLine(
@@ -701,7 +703,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         tension: 0.25,
         pointRadius: 3,
         yAxisID: 'y',
-        order: 2,
+        order: 3,
       },
       {
         label: 'Darts / leg',
@@ -715,9 +717,10 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         tension: 0.25,
         pointRadius: 3,
         yAxisID: 'yDarts',
-        // Lower order draws on top: the amber/red points stay visible where the
-        // two lines cross, instead of hiding under the Hit % points.
-        order: 1,
+        // Lower order draws on top: the amber/red points stay above the Hit %
+        // line (order 3), while the dotted rolling averages (order 1) sit in
+        // front of both raw series.
+        order: 2,
       },
       ...(points.length >= ROLLING_WINDOW
         ? [
