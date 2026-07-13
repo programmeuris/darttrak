@@ -50,7 +50,9 @@ Two reasons:
   before them, green when improving), dated personal bests (fastest leg, best
   average, best checkout, best visit / best leg hit %), and a per-area ±
   column showing where your Around the Clock hit % improved between the
-  earlier and recent halves of your games.
+  earlier and recent halves of your games. Charts size to the viewport and
+  every chart expands into a fullscreen viewer (rotate to landscape for the
+  most plot area).
 - **Backup & restore**: export all data to JSON and re-import it (your only
   backup). Imports are validated up front and rejected whole if the file is
   corrupt or from a newer app version — importing the wrong file can't wipe

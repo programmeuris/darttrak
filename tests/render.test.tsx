@@ -863,6 +863,34 @@ describe('player profiles', () => {
     );
   });
 
+  it('PlayerStats charts expand into a fullscreen viewer and close on Escape', async () => {
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: 'm-chart',
+        gameType: '501',
+        playerIds: [alice.id],
+        winnerId: alice.id,
+        legs: [makeLeg('m-chart', [makeTurn(alice.id, [S(20), S(20), S(20)], 441)], alice.id)],
+      }),
+    );
+    render(<PlayerStats playerId={alice.id} />);
+
+    const expand = await screen.findByRole('button', { name: 'Expand Average Per Match chart' });
+    expand.focus(); // jsdom doesn't focus on click; real browsers do
+    fireEvent.click(expand);
+
+    // Fullscreen dialog opens with focus on its close button.
+    const dialog = screen.getByRole('dialog', { name: 'Average Per Match chart' });
+    const close = screen.getByRole('button', { name: 'Close chart' });
+    expect(document.activeElement).toBe(close);
+
+    // Escape dismisses and focus returns to the expand button.
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(expand);
+  });
+
   it('PlayerStats ATC shows a direction-aware trend row once enough legs exist', async () => {
     const alice = await addPlayer('Alice');
     // Six single-variant games: three all-miss legs, then three all-hit legs
@@ -930,13 +958,13 @@ describe('player profiles', () => {
     // Hit % sorts highest-first on the first click, lowest-first on the second.
     fireEvent.click(screen.getByRole('button', { name: 'Hit %' }));
     expect(areaOrder().slice(0, 3)).toEqual(['2', '1', '3']);
-    fireEvent.click(screen.getByRole('button', { name: /Hit %/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Hit %/ }));
     expect(areaOrder().slice(0, 3)).toEqual(['3', '1', '2']);
 
     // Area sorts back to sequence, then reverses on a second click.
     fireEvent.click(screen.getByRole('button', { name: 'Area' }));
     expect(areaOrder().slice(0, 3)).toEqual(['1', '2', '3']);
-    fireEvent.click(screen.getByRole('button', { name: /Area/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Area/ }));
     expect(areaOrder().slice(0, 3)).toEqual(['3', '2', '1']);
   });
 

@@ -42,12 +42,21 @@ const shortDate = (d: number) => new Date(d).toLocaleDateString();
 // Trailing window for the smoothed trend line overlaid on the raw series.
 const ROLLING_WINDOW = 5;
 
+// Cap and keep the x labels horizontal: rendering every "Match N"/"Leg N"
+// label rotates them diagonally and eats the bottom quarter of an
+// already-small phone chart. The tooltip still identifies every point.
+const X_TICKS = { color: TEXT, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 };
+
 function axes(yFrom0 = true) {
   return {
-    x: { ticks: { color: TEXT }, grid: { color: GRID } },
+    x: { ticks: X_TICKS, grid: { color: GRID } },
     y: { ticks: { color: TEXT }, grid: { color: GRID }, beginAtZero: yFrom0 },
   };
 }
+
+// Raw-series points shrink once the series is long enough that full-size
+// points would smear into a solid band.
+const pointSize = (n: number) => (n > 30 ? 2 : 3);
 const lineOpts: ChartOptions<'line'> = {
   responsive: true,
   maintainAspectRatio: false,
@@ -118,7 +127,7 @@ function atcVariantOpts(points: { label: string; cleared: boolean }[]): ChartOpt
       },
     },
     scales: {
-      x: { ticks: { color: TEXT }, grid: { color: GRID } },
+      x: { ticks: X_TICKS, grid: { color: GRID } },
       y: {
         type: 'linear',
         position: 'left',
@@ -147,7 +156,7 @@ function line(label: string, data: (number | null)[], color: string, fill = fals
     backgroundColor: fill ? `${color}33` : color,
     tension: 0.25,
     fill,
-    pointRadius: 3,
+    pointRadius: pointSize(data.length),
     spanGaps: true,
   };
 }
@@ -202,12 +211,80 @@ function TrendCell({
   );
 }
 
+/**
+ * Chart container with a corner button that reopens the same chart in a
+ * fullscreen overlay — inline charts are cramped on a phone, and rotating to
+ * landscape gives the expanded view several times the plot area. The children
+ * are rendered twice (a second chart instance), so data and options carry
+ * over unchanged.
+ */
+function ExpandableChart({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const restoreRef = useRef<HTMLElement | null>(null);
+
+  // Same focus contract as the delete dialog: move focus in while open,
+  // return it to the expand button on close.
+  useEffect(() => {
+    if (open) {
+      restoreRef.current = document.activeElement as HTMLElement | null;
+      closeRef.current?.focus();
+    } else {
+      restoreRef.current?.focus();
+      restoreRef.current = null;
+    }
+  }, [open]);
+
+  return (
+    <>
+      <div className="chart-wrap">
+        {children}
+        <button
+          type="button"
+          className="chart-expand-btn"
+          aria-label={`Expand ${title} chart`}
+          onClick={() => setOpen(true)}
+        >
+          ⛶
+        </button>
+      </div>
+      {open && (
+        <div
+          className="chart-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${title} chart`}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setOpen(false);
+            // The close button is the only focusable control — keep Tab on it.
+            if (e.key === 'Tab') e.preventDefault();
+          }}
+        >
+          <div className="chart-lightbox-bar">
+            <span className="chart-lightbox-title">{title}</span>
+            <button
+              ref={closeRef}
+              type="button"
+              className="icon-btn"
+              aria-label="Close chart"
+              onClick={() => setOpen(false)}
+            >
+              ✕
+            </button>
+          </div>
+          <div className="chart-lightbox-body">{children}</div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <section className="card">
       <h2 className="card-title">{title}</h2>
       {subtitle && <p className="muted">{subtitle}</p>}
-      <div className="chart-wrap">{children}</div>
+      <ExpandableChart title={title}>{children}</ExpandableChart>
     </section>
   );
 }
@@ -701,7 +778,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         borderColor: BLUE,
         backgroundColor: BLUE,
         tension: 0.25,
-        pointRadius: 3,
+        pointRadius: pointSize(points.length),
         yAxisID: 'y',
         order: 3,
       },
@@ -715,7 +792,7 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
         pointBackgroundColor: points.map((p) => (p.cleared ? AMBER : ACCENT)),
         pointBorderColor: points.map((p) => (p.cleared ? AMBER : ACCENT)),
         tension: 0.25,
-        pointRadius: 3,
+        pointRadius: pointSize(points.length),
         yAxisID: 'yDarts',
         // Lower order draws on top: the amber/red points stay above the Hit %
         // line (order 3), while the dotted rolling averages (order 1) sit in
@@ -837,9 +914,9 @@ function Atc({ matches, playerId }: { matches: Match[]; playerId: string }) {
               {points.some((p) => !p.cleared) &&
                 ' Red points mark legs where the board wasn’t cleared.'}
             </p>
-            <div className="chart-wrap">
+            <ExpandableChart title="Hit % and darts per leg">
               <Line data={chartData} options={atcVariantOpts(points)} />
-            </div>
+            </ExpandableChart>
           </>
         )}
         <AtcTargets
