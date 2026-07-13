@@ -817,7 +817,52 @@ body {
 /* ---- Charts ---- */
 .chart-wrap {
   position: relative;
-  height: 240px;
+  /* Grow with the viewport: taller on phones in portrait (70vw), bounded by
+     the viewport height in landscape (55vh), never below the old fixed size
+     or above what a desktop card needs. */
+  height: clamp(240px, min(70vw, 55vh), 420px);
+}
+.chart-expand-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+/* Fullscreen chart viewer — the whole screen becomes plot area, which in
+   landscape is several times the inline chart. */
+.chart-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right))
+    calc(10px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));
+}
+.chart-lightbox-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.chart-lightbox-title {
+  font-weight: 600;
+}
+.chart-lightbox-body {
+  flex: 1;
+  position: relative;
+  min-height: 0; /* let the flex child shrink so the canvas sizes to it */
 }
 
 /* ---- Stats tabs ---- */
