@@ -8,10 +8,12 @@ import {
   exportAllData,
   importAllData,
 } from '../db';
+import { readMainPlayer, writeMainPlayer } from '../prefs';
 import type { Player, ExportBundle } from '../types';
 
 export function Home() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [mainId, setMainId] = useState<string | null>(() => readMainPlayer());
   const [name, setName] = useState('');
   const [pendingDelete, setPendingDelete] = useState<Player | null>(null);
   const [exportedBeforeDelete, setExportedBeforeDelete] = useState(false);
@@ -87,6 +89,15 @@ export function Home() {
     setPendingDelete(p);
   }
 
+  // Only one main player exists per device; starring someone else moves the
+  // star, starring the current main removes it.
+  function toggleMain(p: Player) {
+    const next = mainId === p.id ? null : p.id;
+    setMainId(next);
+    writeMainPlayer(next);
+    toast(next ? `${p.name} is now the main player` : 'Main player cleared');
+  }
+
   async function confirmDelete() {
     if (!pendingDelete) return;
     const { id, name } = pendingDelete;
@@ -97,6 +108,10 @@ export function Home() {
       console.error(err);
       toast('Delete failed — nothing was removed. Try again.', 'error');
       return;
+    }
+    if (mainId === id) {
+      setMainId(null);
+      writeMainPlayer(null);
     }
     await refresh();
     toast(`Deleted ${name} and their matches`);
@@ -166,6 +181,18 @@ export function Home() {
           ) : (
             players.map((p) => (
               <li className="roster-item" key={p.id}>
+                <button
+                  className={`icon-btn star ${mainId === p.id ? 'active' : ''}`}
+                  aria-label={
+                    mainId === p.id
+                      ? `${p.name} is the main player — tap to clear`
+                      : `Make ${p.name} the main player`
+                  }
+                  aria-pressed={mainId === p.id}
+                  onClick={() => toggleMain(p)}
+                >
+                  {mainId === p.id ? '★' : '☆'}
+                </button>
                 <button
                   className="roster-name"
                   aria-label={`Open ${p.name}'s profile`}

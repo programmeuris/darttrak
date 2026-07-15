@@ -76,6 +76,40 @@ describe('screens render without crashing', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it('Home stars exactly one main player per device and Setup preselects them', async () => {
+    await addPlayer('Alice');
+    await addPlayer('Bob');
+    const { unmount } = render(<Home />);
+
+    // Star Alice, then Bob — the star moves; only one main player exists.
+    fireEvent.click(await screen.findByLabelText('Make Alice the main player'));
+    expect(screen.getByLabelText('Alice is the main player — tap to clear')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Make Bob the main player'));
+    expect(screen.getByLabelText('Make Alice the main player')).toBeTruthy();
+    expect(screen.getByLabelText('Bob is the main player — tap to clear')).toBeTruthy();
+    unmount();
+
+    // New game: Bob is preselected (throw-order badge 1) and starred.
+    render(<Setup />);
+    const bobLabel = (await screen.findByText('Bob')).closest('label')!;
+    await waitFor(() => expect(bobLabel.querySelector('.order-badge')!.textContent).toBe('1'));
+    expect(bobLabel.querySelector('.main-star')).toBeTruthy();
+    expect(
+      (await screen.findByText('Alice')).closest('label')!.querySelector('.order-badge'),
+    ).toBeNull();
+  });
+
+  it('Home clears the main player when they are deleted', async () => {
+    await addPlayer('Alice');
+    render(<Home />);
+    fireEvent.click(await screen.findByLabelText('Make Alice the main player'));
+
+    fireEvent.click(screen.getByLabelText('Delete Alice'));
+    fireEvent.click(screen.getByText('Delete'));
+    await waitFor(() => expect(screen.getByText('No players yet. Add one below.')).toBeTruthy());
+    expect(localStorage.getItem('darttrak:mainPlayer')).toBeNull();
+  });
+
   it('Setup renders game-type options and shows the ATC ring picker', async () => {
     render(<Setup />);
     expect(screen.getByText('Game Type')).toBeTruthy();

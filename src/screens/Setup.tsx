@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { navigate } from '../router';
 import { toast } from '../toast';
-import { readPref, writePref } from '../prefs';
+import { readMainPlayer, readPref, writePref } from '../prefs';
 import { Header } from '../components/Header';
 import { getPlayers, getAllMatches, saveMatch, uuid } from '../db';
 import { newTrainingState } from '../training';
@@ -59,14 +59,22 @@ export function Setup() {
     writePref('setup', JSON.stringify({ gameType, legs, doubleOut, atcRing: ring }));
   }, [gameType, legs, doubleOut, ring]);
 
+  const mainId = readMainPlayer();
+
   useEffect(() => {
     getPlayers()
-      .then(setPlayers)
+      .then((ps) => {
+        setPlayers(ps);
+        // The device's main player starts every new game preselected.
+        if (mainId && ps.some((p) => p.id === mainId)) {
+          setSelected((s) => (s.length === 0 ? [mainId] : s));
+        }
+      })
       .catch((err) => {
         console.error(err);
         toast('Failed to load players', 'error');
       });
-  }, []);
+  }, [mainId]);
 
   const isAtc = gameType === 'AroundTheClock';
   const isTraining = gameType === 'Training';
@@ -188,7 +196,15 @@ export function Setup() {
                   checked={selected.includes(p.id)}
                   onChange={(e) => togglePlayer(p.id, e.target.checked)}
                 />
-                <span className="check-name">{p.name}</span>
+                <span className="check-name">
+                  {p.name}
+                  {p.id === mainId && (
+                    <span className="main-star" aria-label="Main player">
+                      {' '}
+                      ★
+                    </span>
+                  )}
+                </span>
                 {selected.includes(p.id) && (
                   <span
                     className="order-badge"
