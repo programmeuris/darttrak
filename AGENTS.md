@@ -63,6 +63,9 @@ invent storage.
   `Bull`=D25 — see `trainingFieldLabel`/`fieldIdFromLabel`). Unlike other
   modes, `in_progress` training rounds COUNT in stats (deliberate: the bag
   deals a uniformly random subset, so mid-round figures are unbiased).
+- Training numpad semantics: a typed count n means n misses on the miss
+  button (↵), but "the hit came with dart n" on HIT — n−1 misses plus the
+  hit, n darts total. With nothing typed: one miss, or a first-dart hit.
 - Stats modules filter by `gameType` — keep modes from leaking into each
   other's numbers.
 
@@ -73,8 +76,8 @@ mid-save races:
 
 - Every save path uses the `submitting` ref + `saving` state pair; buttons are
   disabled while saving. Failed saves toast an error and leave state unchanged.
-- Destructive taps need friction: undo-turn is a two-press confirm (arms red
-  for 3s); miss-fill has a 400ms cooldown.
+- Destructive taps need friction: every undo button is a two-press confirm
+  (arms red for 3s); miss-fill has a 400ms cooldown.
 - Keep layout stable while playing (fixed-height status regions) — no jumping
   buttons.
 
