@@ -28,8 +28,10 @@ Two reasons:
   from match setup: a shuffle bag deals all 62 board fields (singles, doubles,
   trebles, outer, bull) in random order and you throw at each until you hit it;
   hitting the whole board completes a round and the next bag starts on your
-  next throw. Misses register by tapping or via a numpad (type a count, commit
-  on ↵ — HIT flushes typed misses first). Stats live in their own tab:
+  next throw. Throws register on a numpad: MISS records a single miss, or type
+  a count first to add that many misses at once (↵) or to record a hit with
+  that dart (HIT records the misses before it too). Stats live in their own
+  tab:
   per-round darts-per-target and first-dart hit % with rolling averages and
   trend deltas, a dated fewest-darts-per-round personal best, and a
   Single/Double/Treble hit-% matrix for every field.
