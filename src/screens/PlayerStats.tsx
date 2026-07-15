@@ -21,6 +21,12 @@ import {
   atcRingLabel,
 } from '../atc';
 import type { AtcTargetStat } from '../atc';
+import {
+  trainingRounds,
+  trainingBestRound,
+  trainingFieldStats,
+  trainingFieldLabel,
+} from '../training';
 import type { Player, Match, AtcRing } from '../types';
 
 const TEXT = '#eaeaea';
@@ -87,9 +93,13 @@ function matchIndexOpts(points: { label: string }[]): ChartOptions<'line'> {
   };
 }
 
-// Per-variant ATC chart: Hit % on the left axis (0–100), throws-to-finish on the
-// right axis (auto-scaled), so both trends read off one graph.
-function atcVariantOpts(points: { label: string; cleared: boolean }[]): ChartOptions<'line'> {
+// Dual-axis progression chart (ATC per-leg, Training per-round): a hit % on
+// the left axis (0–100), a darts figure on the right axis (auto-scaled), so
+// both trends read off one graph.
+function atcVariantOpts(
+  points: { label: string; cleared: boolean }[],
+  dartsTitle = 'Darts / leg',
+): ChartOptions<'line'> {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -142,7 +152,7 @@ function atcVariantOpts(points: { label: string; cleared: boolean }[]): ChartOpt
         position: 'right',
         ticks: { color: TEXT },
         grid: { drawOnChartArea: false },
-        title: { display: true, text: 'Darts / leg', color: TEXT },
+        title: { display: true, text: dartsTitle, color: TEXT },
       },
     },
   };
@@ -310,12 +320,13 @@ function Empty({ text }: { text: string }) {
 // The nav has two levels: a top row of game modes, and — under the x01 mode — a
 // sub-row of analytical lenses. ATC is its own mode with its own internal views.
 type X01Lens = 'overview' | 'consistency' | 'finishing' | 'scoring' | 'h2h';
-type StatsMode = 'x01' | 'atc';
-type TabId = X01Lens | 'atc'; // the active leaf view (an x01 lens, or atc)
+type StatsMode = 'x01' | 'atc' | 'training';
+type TabId = X01Lens | 'atc' | 'training'; // the active leaf view
 
 const MODES: { id: StatsMode; label: string }[] = [
   { id: 'x01', label: 'x01' },
   { id: 'atc', label: 'Around the Clock' },
+  { id: 'training', label: 'Training' },
 ];
 const X01_TABS: { id: X01Lens; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -326,7 +337,7 @@ const X01_TABS: { id: X01Lens; label: string }[] = [
 ];
 
 // Remember the last-open tab per player. Falls back to overview.
-const TAB_IDS = new Set<string>([...X01_TABS.map((t) => t.id), 'atc']);
+const TAB_IDS = new Set<string>([...X01_TABS.map((t) => t.id), 'atc', 'training']);
 
 function readStoredTab(playerId: string): TabId {
   const v = readPref(`statsTab:${playerId}`);
@@ -373,14 +384,14 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
     if (playerId) writeStoredTab(playerId, t);
   }
 
-  // Active top-level mode, plus the last x01 lens so switching x01 ← ATC returns
-  // to the lens you were on rather than always resetting to Overview.
-  const mode: StatsMode = tab === 'atc' ? 'atc' : 'x01';
+  // Active top-level mode, plus the last x01 lens so switching back to x01
+  // returns to the lens you were on rather than always resetting to Overview.
+  const mode: StatsMode = tab === 'atc' || tab === 'training' ? tab : 'x01';
   const lastX01Lens = useRef<X01Lens>('overview');
   useEffect(() => {
-    if (tab !== 'atc') lastX01Lens.current = tab;
+    if (tab !== 'atc' && tab !== 'training') lastX01Lens.current = tab;
   }, [tab]);
-  const selectMode = (m: StatsMode) => selectTab(m === 'atc' ? 'atc' : lastX01Lens.current);
+  const selectMode = (m: StatsMode) => selectTab(m === 'x01' ? lastX01Lens.current : m);
   const names = new Map(players.map((p) => [p.id, p.name]));
   const onBack = () => navigate(lockedId ? `/player/${lockedId}` : '/');
 
@@ -445,6 +456,7 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
         {tab === 'scoring' && <Scoring matches={matches} playerId={playerId} />}
         {tab === 'h2h' && <HeadToHead matches={matches} playerId={playerId} names={names} />}
         {tab === 'atc' && <Atc key={playerId} matches={matches} playerId={playerId} />}
+        {tab === 'training' && <Training key={playerId} matches={matches} playerId={playerId} />}
       </div>
     </div>
   );
@@ -1040,6 +1052,168 @@ function AtcTargets({
         ± compares each area's hit % in the recent half of those games with the earlier half
         (shown once both halves have enough darts).
       </p>
+    </>
+  );
+}
+
+function Training({ matches, playerId }: { matches: Match[]; playerId: string }) {
+  const rounds = trainingRounds(matches, playerId);
+  if (rounds.length === 0) {
+    return <Empty text="No training recorded yet — start one from New Match." />;
+  }
+
+  const best = trainingBestRound(matches, playerId);
+  const totalDarts = rounds.reduce((a, r) => a + r.darts, 0);
+  const totalResolved = rounds.reduce((a, r) => a + r.resolved, 0);
+  const totalAttempts = rounds.reduce((a, r) => a + r.attempts, 0);
+  const overallAvg = totalResolved
+    ? rounds.reduce((a, r) => a + r.avgDarts * r.resolved, 0) / totalResolved
+    : 0;
+  const overallFirst = totalAttempts
+    ? (rounds.reduce((a, r) => a + (r.firstDartHitRate * r.attempts) / 100, 0) / totalAttempts) *
+      100
+    : 0;
+
+  // Per-round series: both metrics are per-target figures, so the live round
+  // (a uniformly random subset of the bag) plots unbiased alongside complete
+  // ones — no red-point treatment needed.
+  const points = rounds.map((r) => ({
+    label: `${r.label}${r.complete ? '' : ' · in progress'}`,
+    cleared: true,
+  }));
+  const hitValues = rounds.map((r) => r.firstDartHitRate);
+  const dartValues = rounds.map((r) => (r.resolved > 0 ? r.avgDarts : null));
+  const hitTrend = trendDelta(hitValues);
+  const dartsTrend = trendDelta(dartValues.filter((v): v is number => v !== null));
+  const chartData: ChartData<'line'> = {
+    labels: rounds.map((_, i) => `Round ${i + 1}`),
+    datasets: [
+      {
+        label: 'First-dart Hit %',
+        data: hitValues.map(round),
+        borderColor: BLUE,
+        backgroundColor: BLUE,
+        tension: 0.25,
+        pointRadius: pointSize(rounds.length),
+        yAxisID: 'y',
+        order: 3,
+      },
+      {
+        label: 'Avg darts / target',
+        data: dartValues.map((v) => (v === null ? null : round(v))),
+        borderColor: AMBER,
+        backgroundColor: AMBER,
+        tension: 0.25,
+        pointRadius: pointSize(rounds.length),
+        spanGaps: true,
+        yAxisID: 'yDarts',
+        order: 2,
+      },
+      ...(rounds.length >= ROLLING_WINDOW
+        ? [
+            rollingLine(
+              `Hit % (${ROLLING_WINDOW}-round avg)`,
+              rollingMean(hitValues, ROLLING_WINDOW),
+              BLUE,
+              'y',
+            ),
+            rollingLine(
+              `Darts (${ROLLING_WINDOW}-round avg)`,
+              rollingMean(dartValues, ROLLING_WINDOW, 3),
+              AMBER,
+              'yDarts',
+            ),
+          ]
+        : []),
+    ],
+  };
+
+  const fields = new Map(trainingFieldStats(matches, playerId).map((f) => [f.id, f]));
+  const cell = (id: string) => {
+    const f = fields.get(id);
+    if (!f || f.darts === 0) return <td className="num">—</td>;
+    return (
+      <td className="num" title={`${f.hits}/${f.darts}`}>
+        {f.hitRate.toFixed(0)}%
+      </td>
+    );
+  };
+
+  return (
+    <>
+      <section className="card">
+        <Grid
+          cells={[
+            [String(rounds.filter((r) => r.complete).length), `Rounds (${rounds.length} started)`],
+            [
+              best ? String(best.value) : '—',
+              best ? `Best Round (darts) · ${shortDate(best.date)}` : 'Best Round (darts)',
+            ],
+            [String(totalResolved), 'Targets Hit'],
+            [String(totalDarts), 'Darts Thrown'],
+            [overallAvg > 0 ? overallAvg.toFixed(1) : '—', 'Avg Darts / Target'],
+            [`${overallFirst.toFixed(0)}%`, 'First-dart Hit %'],
+          ]}
+        />
+        <p className="muted">
+          A round is one pass through the shuffle bag — every field on the board, once.
+        </p>
+      </section>
+      {(hitTrend || dartsTrend) && (
+        <section className="card">
+          <h2 className="card-title">Trend</h2>
+          <div className="stat-grid">
+            <TrendCell label="First-dart Hit %" trend={hitTrend} goodWhen="up" unit="%" />
+            <TrendCell label="Darts / target" trend={dartsTrend} goodWhen="down" />
+          </div>
+          <p className="muted">Recent rounds vs the rounds before them — green is improving.</p>
+        </section>
+      )}
+      <section className="card">
+        <h2 className="card-title">Progression</h2>
+        <p className="muted">
+          First-dart hit % and darts per target, per round.
+          {rounds.length >= ROLLING_WINDOW &&
+            ` The dotted lines are ${ROLLING_WINDOW}-round rolling averages.`}
+        </p>
+        <ExpandableChart title="Training progression">
+          <Line data={chartData} options={atcVariantOpts(points, 'Avg darts / target')} />
+        </ExpandableChart>
+      </section>
+      <section className="card">
+        <h2 className="card-title">Hit % Per Field</h2>
+        <p className="muted">
+          Across all training. Tap and hold a cell for its hits/darts.
+        </p>
+        <table className="area-table">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th className="num">Single</th>
+              <th className="num">Double</th>
+              <th className="num">Treble</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
+              <tr key={n}>
+                <td className="area-name">{n}</td>
+                {cell(`S${n}`)}
+                {cell(`D${n}`)}
+                {cell(`T${n}`)}
+              </tr>
+            ))}
+            <tr>
+              {/* The bull row: its "single" is the outer (25), its "double" the
+                  bull (50); a treble bull doesn't exist. */}
+              <td className="area-name">{trainingFieldLabel('D25')}</td>
+              {cell('S25')}
+              {cell('D25')}
+              <td className="num">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
     </>
   );
 }

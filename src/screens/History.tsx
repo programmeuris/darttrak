@@ -5,6 +5,7 @@ import { Header } from '../components/Header';
 import { getAllMatches, getPlayers, getMatch, deleteMatch } from '../db';
 import { startingScore } from '../scoring';
 import { ATC_TARGET_COUNT, atcRingLabel } from '../atc';
+import { fieldIdFromLabel, trainingFieldLabel } from '../training';
 import type { Match, Player, GameType } from '../types';
 
 // `playerId`, when set, scopes the screen to a single player's matches (reached
@@ -75,6 +76,7 @@ function MatchList({ lockedPlayerId, base }: { lockedPlayerId?: string; base: st
             <option value="501">501</option>
             <option value="301">301</option>
             <option value="AroundTheClock">Around the Clock</option>
+            <option value="Training">Training</option>
           </select>
         </div>
       </section>
@@ -96,6 +98,8 @@ function MatchList({ lockedPlayerId, base }: { lockedPlayerId?: string; base: st
                 <div className="match-players">{m.playerIds.map(nameOf).join(' vs ')}</div>
                 {m.status === 'in_progress' ? (
                   <span className="tag in-progress">In progress</span>
+                ) : m.gameType === 'Training' ? (
+                  <span className="tag">🎯 Round complete</span>
                 ) : (
                   <span className="tag">🏆 {m.winnerId ? nameOf(m.winnerId) : '—'}</span>
                 )}
@@ -145,8 +149,13 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
 
   const nameOf = (id: string) => names.get(id) ?? 'Unknown';
   const isAtc = match.gameType === 'AroundTheClock';
+  const isTraining = match.gameType === 'Training';
   const start = startingScore(match.gameType === '301' ? '301' : '501');
-  const cols = isAtc ? ['Player', 'Darts', 'Hits', 'Cleared'] : ['Player', 'Darts', 'Scored', 'Left'];
+  const cols = isTraining
+    ? ['Target', 'Sequence', 'Darts']
+    : isAtc
+      ? ['Player', 'Darts', 'Hits', 'Cleared']
+      : ['Player', 'Darts', 'Scored', 'Left'];
 
   return (
     <div className="screen">
@@ -159,15 +168,19 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
         </div>
         <div className="match-players">{match.playerIds.map(nameOf).join(' vs ')}</div>
         <div className="muted">
-          {isAtc
-            ? `Best of ${match.format.legs} · ${atcRingLabel(match.atcRing ?? 'single')}`
-            : `Best of ${match.format.legs} · ${match.doubleOut ? 'Double Out' : 'Straight Out'} · Start ${start}`}
+          {isTraining
+            ? 'Training round — every field once, in shuffle-bag order'
+            : isAtc
+              ? `Best of ${match.format.legs} · ${atcRingLabel(match.atcRing ?? 'single')}`
+              : `Best of ${match.format.legs} · ${match.doubleOut ? 'Double Out' : 'Straight Out'} · Start ${start}`}
         </div>
         {match.status === 'completed' ? (
-          <div className="tag">🏆 {match.winnerId ? nameOf(match.winnerId) : '—'}</div>
+          <div className="tag">
+            {isTraining ? '🎯 Round complete' : `🏆 ${match.winnerId ? nameOf(match.winnerId) : '—'}`}
+          </div>
         ) : (
           <button className="btn primary" onClick={() => navigate(`/live/${match.id}`)}>
-            Resume Match
+            {isTraining ? 'Continue Training' : 'Resume Match'}
           </button>
         )}
       </section>
@@ -175,8 +188,8 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
       {match.legs.map((leg, i) => (
         <section className="card" key={leg.id}>
           <h2 className="card-title">
-            Leg {i + 1}
-            {leg.winnerId && <span className="badge"> · {nameOf(leg.winnerId)}</span>}
+            {isTraining ? 'Targets' : `Leg ${i + 1}`}
+            {!isTraining && leg.winnerId && <span className="badge"> · {nameOf(leg.winnerId)}</span>}
           </h2>
           <table className="turn-table">
             <thead>
@@ -195,6 +208,14 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
                     No turns
                   </td>
                 </tr>
+              ) : isTraining ? (
+                leg.turns.map((turn, ti) => (
+                  <tr key={ti}>
+                    <td>{turn.darts.length ? trainingFieldLabel(fieldIdFromLabel(turn.darts[0].label)) : '—'}</td>
+                    <td>{turn.darts.map((d) => (d.score > 0 ? '✓' : '✗')).join(' ')}</td>
+                    <td className="num">{turn.darts.length}</td>
+                  </tr>
+                ))
               ) : (
                 leg.turns.map((turn, ti) => (
                   <tr className={turn.isBust ? 'bust' : ''} key={ti}>

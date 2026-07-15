@@ -14,10 +14,11 @@ import { Setup } from '../src/screens/Setup';
 import { PlayerStats } from '../src/screens/PlayerStats';
 import { Live } from '../src/screens/Live';
 import { LiveAtc } from '../src/screens/LiveAtc';
+import { LiveTraining } from '../src/screens/LiveTraining';
 import { Profile } from '../src/screens/Profile';
 import { History } from '../src/screens/History';
-import { addPlayer, saveMatch, getMatch, importAllData } from '../src/db';
-import { makeMatch, makeLeg, makeTurn, S, atcHitDart, atcMissDart } from './helpers';
+import { addPlayer, saveMatch, getMatch, getAllMatches, importAllData } from '../src/db';
+import { makeMatch, makeLeg, makeTurn, S, dart, atcHitDart, atcMissDart } from './helpers';
 import type { AtcRing } from '../src/types';
 
 afterEach(async () => {
@@ -376,6 +377,128 @@ describe('screens render without crashing', () => {
     await waitFor(async () =>
       expect((await getMatch('atc-undo2'))!.legs[0].turns).toHaveLength(0),
     );
+  });
+
+  it('LiveTraining registers taps and advances through the bag on a hit', async () => {
+    const alice = await addPlayer('Alice');
+    const m = makeMatch({
+      id: 't-live',
+      gameType: 'Training',
+      playerIds: [alice.id],
+      status: 'in_progress',
+      legs: [makeLeg('t-live', [])],
+    });
+    m.training = { target: 'T18', bag: ['S5'] };
+    await saveMatch(m);
+
+    render(<LiveTraining matchId="t-live" />);
+    expect(await screen.findByText('T18')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'MISS ✗' }));
+    await waitFor(async () =>
+      expect((await getMatch('t-live'))!.legs[0].turns[0].darts).toHaveLength(1),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
+
+    await waitFor(async () => {
+      const saved = await getMatch('t-live');
+      expect(saved!.legs[0].turns).toHaveLength(1);
+      expect(saved!.legs[0].turns[0].darts.map((d) => d.score)).toEqual([0, 1]);
+      expect(saved!.training!.target).toBe('S5'); // next field dealt from the bag
+    });
+  });
+
+  it('LiveTraining numpad commits typed misses on enter and flushes them on HIT', async () => {
+    const alice = await addPlayer('Alice');
+    const m = makeMatch({
+      id: 't-pad',
+      gameType: 'Training',
+      playerIds: [alice.id],
+      status: 'in_progress',
+      legs: [makeLeg('t-pad', [])],
+    });
+    m.training = { target: 'D10', bag: ['S1'] };
+    await saveMatch(m);
+
+    render(<LiveTraining matchId="t-pad" />);
+    await screen.findByText('D10');
+    fireEvent.click(screen.getByRole('button', { name: 'Numpad' }));
+
+    // Digits accumulate; ↵ commits them as misses in one save.
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
+    fireEvent.click(screen.getByRole('button', { name: '2' }));
+    expect(screen.getByText('+12 misses')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '↵ Add misses' }));
+    await waitFor(async () =>
+      expect((await getMatch('t-pad'))!.legs[0].turns[0].darts).toHaveLength(12),
+    );
+
+    // HIT flushes any typed misses first, then the hit — one tap total.
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    fireEvent.click(screen.getByRole('button', { name: /^HIT ✓ \(after \+3 misses\)/ }));
+    await waitFor(async () => {
+      const saved = await getMatch('t-pad');
+      expect(saved!.legs[0].turns[0].darts).toHaveLength(16);
+      expect(saved!.training!.target).toBe('S1');
+    });
+  });
+
+  it('LiveTraining completes the round on the last field and rolls into a new bag', async () => {
+    const alice = await addPlayer('Alice');
+    const m = makeMatch({
+      id: 't-final',
+      gameType: 'Training',
+      playerIds: [alice.id],
+      status: 'in_progress',
+      legs: [makeLeg('t-final', [])],
+    });
+    m.training = { target: 'S3', bag: [] }; // last field of the round
+    await saveMatch(m);
+
+    render(<LiveTraining matchId="t-final" />);
+    await screen.findByText('3');
+    fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
+
+    await waitFor(async () => {
+      const finished = await getMatch('t-final');
+      expect(finished!.status).toBe('completed');
+      expect(finished!.winnerId).toBe(alice.id);
+    });
+    // A fresh round record exists with a full new bag, and we navigated to it.
+    const fresh = (await getAllMatches()).find(
+      (x) => x.gameType === 'Training' && x.status === 'in_progress',
+    );
+    expect(fresh).toBeTruthy();
+    expect(1 + fresh!.training!.bag.length).toBe(62);
+    expect(location.hash).toBe(`#/live/${fresh!.id}`);
+  });
+
+  it('Setup configures Training as strictly solo with no match options', async () => {
+    await addPlayer('Alice');
+    await addPlayer('Bob');
+    render(<Setup />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Training' }));
+
+    // No format / double-out ceremony, and the player section is singular.
+    expect(screen.queryByText('Format')).toBeNull();
+    expect(screen.queryByText('Double Out')).toBeNull();
+    expect(screen.getByText('Player')).toBeTruthy();
+
+    // Picking a second player replaces the first instead of adding.
+    const aliceLabel = screen.getByText('Alice').closest('label')!;
+    const bobLabel = screen.getByText('Bob').closest('label')!;
+    fireEvent.click(aliceLabel.querySelector('input')!);
+    fireEvent.click(bobLabel.querySelector('input')!);
+    expect(aliceLabel.querySelector('.order-badge')).toBeNull();
+    expect(bobLabel.querySelector('.order-badge')!.textContent).toBe('1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start Training' }));
+    await waitFor(async () => {
+      const created = (await getAllMatches()).find((x) => x.gameType === 'Training');
+      expect(created).toBeTruthy();
+      expect(created!.playerIds).toHaveLength(1);
+      expect(1 + created!.training!.bag.length).toBe(62);
+    });
   });
 
   it('Live keeps the darts and shows an error when the turn save fails', async () => {
@@ -861,6 +984,36 @@ describe('player profiles', () => {
     expect(screen.getByRole('button', { name: 'Best of 3' }).getAttribute('aria-pressed')).toBe(
       'true',
     );
+  });
+
+  it('PlayerStats Training tab shows round stats and the per-field matrix', async () => {
+    const alice = await addPlayer('Alice');
+    // One completed round's worth of data: T20 in two darts, Outer first dart.
+    await saveMatch(
+      makeMatch({
+        id: 't-stats',
+        date: 7000,
+        gameType: 'Training',
+        playerIds: [alice.id],
+        winnerId: alice.id,
+        status: 'completed',
+        legs: [
+          makeLeg('t-stats', [
+            makeTurn(alice.id, [dart(0, '✗T20'), dart(1, '✓T20')], 0),
+            makeTurn(alice.id, [dart(1, '✓Outer')], 0),
+          ]),
+        ],
+      }),
+    );
+    render(<PlayerStats playerId={alice.id} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Training' }));
+
+    expect(await screen.findByText('Hit % Per Field')).toBeTruthy();
+    // Matrix: T20 hit 1/2 → 50%; the bull row's single column is the outer.
+    expect(screen.getByTitle('1/2').textContent).toBe('50%');
+    expect(screen.getByTitle('1/1').textContent).toBe('100%');
+    // The 3-dart round is the dated best round.
+    expect(screen.getByText(/Best Round \(darts\)/).previousElementSibling!.textContent).toBe('3');
   });
 
   it('PlayerStats charts expand into a fullscreen viewer and close on Escape', async () => {
