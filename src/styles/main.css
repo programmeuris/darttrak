@@ -404,6 +404,7 @@ body {
   border-radius: var(--radius);
   padding: 12px;
   text-align: center;
+  position: relative; /* anchors the .sc-flash overlay */
 }
 .score-card.active {
   border-color: var(--accent);
@@ -449,6 +450,25 @@ body {
 }
 .score-card.active .sc-target {
   color: var(--accent);
+}
+/* Training: the target card flashes when darts land so an entry is visibly
+   received. The overlay remounts (keyed) per entry, replaying the fade. */
+.sc-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  animation: target-flash 0.45s ease-out;
+}
+@keyframes target-flash {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 0;
+  }
 }
 .atc-progress {
   height: 8px;
