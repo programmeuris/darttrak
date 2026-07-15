@@ -488,12 +488,15 @@ describe('screens render without crashing', () => {
       expect((await getMatch('t-pad'))!.legs[0].turns[0].darts).toHaveLength(12),
     );
 
-    // HIT flushes any typed misses first, then the hit — one tap total.
+    // Typing n and pressing HIT means "hit with dart n": n-1 misses then the
+    // hit land in one tap — n darts in total, not n misses plus the hit.
     fireEvent.click(screen.getByRole('button', { name: '3' }));
-    fireEvent.click(screen.getByRole('button', { name: /^HIT ✓ \(after \+3 misses\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^HIT ✓ \(with dart 3\)/ }));
     await waitFor(async () => {
       const saved = await getMatch('t-pad');
-      expect(saved!.legs[0].turns[0].darts).toHaveLength(16);
+      const darts = saved!.legs[0].turns[0].darts;
+      expect(darts).toHaveLength(15); // 12 misses + (2 misses + the hit)
+      expect(darts.map((d) => d.score).slice(-3)).toEqual([0, 0, 1]);
       expect(saved!.training!.target).toBe('S1');
     });
   });
