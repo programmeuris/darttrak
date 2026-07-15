@@ -617,6 +617,10 @@ body {
   grid-template-columns: repeat(5, 1fr);
   gap: 7px;
 }
+/* Training's miss numpad: a phone-style 3×4 dialpad (1–9, then ⌫ 0 ↵). */
+.num-grid.dialpad {
+  grid-template-columns: repeat(3, 1fr);
+}
 .num-btn {
   appearance: none;
   border: none;

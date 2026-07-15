@@ -294,27 +294,30 @@ export function LiveTraining({ matchId }: { matchId: string }) {
           <div className="pad-display" aria-live="polite">
             +{pending || '0'} misses
           </div>
-          <div className="num-grid">
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map((d) => (
+          <div className="num-grid dialpad">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
               <button key={d} className="num-btn" disabled={saving} onClick={() => pressDigit(d)}>
                 {d}
               </button>
             ))}
-          </div>
-          <div className="special-row">
             <button
-              className="num-btn wide"
+              className="num-btn"
+              aria-label="Delete last digit"
               disabled={saving || pending === ''}
               onClick={() => setPending((p) => p.slice(0, -1))}
             >
               ⌫
             </button>
+            <button className="num-btn" disabled={saving} onClick={() => pressDigit('0')}>
+              0
+            </button>
             <button
               className="num-btn wide miss"
+              aria-label="Add misses"
               disabled={saving || !pending}
               onClick={commitPending}
             >
-              ↵ Add misses
+              ↵ Add
             </button>
           </div>
           <button
