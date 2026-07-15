@@ -9,6 +9,7 @@ import {
   importAllData,
 } from '../db';
 import { readMainPlayer, writeMainPlayer } from '../prefs';
+import { startOrContinueTraining } from '../trainingSession';
 import type { Player, ExportBundle } from '../types';
 
 export function Home() {
@@ -87,6 +88,28 @@ export function Home() {
   function handleDelete(p: Player) {
     setExportedBeforeDelete(false);
     setPendingDelete(p);
+  }
+
+  // Training isn't a match, so it starts from Home rather than match setup:
+  // straight into the main player's ongoing round (or the only player's).
+  async function startTraining() {
+    const target =
+      players.find((p) => p.id === mainId) ?? (players.length === 1 ? players[0] : null);
+    if (!target) {
+      toast(
+        players.length === 0
+          ? 'Add a player first'
+          : 'Star a main player to start training from here',
+        'error',
+      );
+      return;
+    }
+    try {
+      navigate(`/live/${await startOrContinueTraining(target.id)}`);
+    } catch (err) {
+      console.error(err);
+      toast('Could not start training. Try again.', 'error');
+    }
   }
 
   // Only one main player exists per device; starring someone else moves the
@@ -170,6 +193,9 @@ export function Home() {
       <div className="home-actions">
         <button className="btn primary big" onClick={() => navigate('/setup')}>
           🎯 New Match
+        </button>
+        <button className="btn big full-row" onClick={startTraining}>
+          🎓 Training
         </button>
       </div>
 

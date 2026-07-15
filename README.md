@@ -23,14 +23,16 @@ Two reasons:
 - **Around the Clock** mode — race 1 → 20 → bull with a hit/miss tap input and a
   Any / Doubles / Trebles ring setting, plus a **Progressive** variant where
   doubles advance +2 and trebles +3 (each tracked separately in stats)
-- **Training** mode — endless solo target practice: a shuffle bag deals all 62
-  board fields (singles, doubles, trebles, outer, bull) in random order and you
-  throw at each until you hit it; hitting the whole board completes a round and
-  the next bag starts on your next throw. Misses register by tapping or via a
-  numpad (type a count, commit on ↵ — HIT flushes typed misses first). Stats
-  live in their own tab: per-round darts-per-target and first-dart hit % with
-  rolling averages and trend deltas, a dated fewest-darts-per-round personal
-  best, and a Single/Double/Treble hit-% matrix for every field.
+- **Training** mode — endless solo target practice, started from the Home
+  screen (straight into the main player's round) or a player's profile, not
+  from match setup: a shuffle bag deals all 62 board fields (singles, doubles,
+  trebles, outer, bull) in random order and you throw at each until you hit it;
+  hitting the whole board completes a round and the next bag starts on your
+  next throw. Misses register by tapping or via a numpad (type a count, commit
+  on ↵ — HIT flushes typed misses first). Stats live in their own tab:
+  per-round darts-per-target and first-dart hit % with rolling averages and
+  trend deltas, a dated fewest-darts-per-round personal best, and a
+  Single/Double/Treble hit-% matrix for every field.
 - **1–4 players** per match, drawn from a saved roster; star one as the
   device's **main player** and they're preselected for every new game and the
   default on the stats screen

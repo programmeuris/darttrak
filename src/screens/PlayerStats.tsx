@@ -1063,7 +1063,7 @@ function AtcTargets({
 function Training({ matches, playerId }: { matches: Match[]; playerId: string }) {
   const rounds = trainingRounds(matches, playerId);
   if (rounds.length === 0) {
-    return <Empty text="No training recorded yet — start one from New Match." />;
+    return <Empty text="No training recorded yet — start one from the Home screen." />;
   }
 
   const best = trainingBestRound(matches, playerId);

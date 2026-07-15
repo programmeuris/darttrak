@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../router';
 import { toast } from '../toast';
-import { getMatch, getPlayers, getAllMatches, saveMatch, deleteMatch, uuid } from '../db';
+import { getMatch, getPlayers, getAllMatches, saveMatch, deleteMatch } from '../db';
 import { readPref, writePref } from '../prefs';
 import {
   TRAINING_FIELD_COUNT,
@@ -12,27 +12,12 @@ import {
   trainingAttempts,
   trainingFieldLabel,
 } from '../training';
+import { newTrainingRound } from '../trainingSession';
 import { StatCell } from '../components/Header';
 import type { Match, Player, Turn } from '../types';
 
 // Sanity cap on one numpad entry — beyond this it's a typo, not a cold streak.
 const MAX_PENDING_DIGITS = 3;
-
-function newRound(playerId: string): Match {
-  const id = uuid();
-  return {
-    id,
-    date: Date.now(),
-    gameType: 'Training',
-    playerIds: [playerId],
-    winnerId: null,
-    format: { legs: 1, sets: 1 },
-    doubleOut: false,
-    training: newTrainingState(),
-    status: 'in_progress',
-    legs: [{ id: uuid(), matchId: id, winnerId: null, turns: [] }],
-  };
-}
 
 export function LiveTraining({ matchId }: { matchId: string }) {
   const [match, setMatch] = useState<Match | null>(null);
@@ -145,7 +130,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
       setPending('');
       if (finishedRound) {
         const darts = trainingAttempts(next).reduce((acc, a) => acc + a.darts, 0);
-        const fresh = newRound(next.playerIds[0]);
+        const fresh = newTrainingRound(next.playerIds[0]);
         await saveMatch(fresh);
         toast(`Board complete in ${darts} darts!`);
         navigate(`/live/${fresh.id}`, { replace: true });

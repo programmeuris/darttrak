@@ -3,15 +3,13 @@ import { navigate } from '../router';
 import { toast } from '../toast';
 import { readMainPlayer, readPref, writePref } from '../prefs';
 import { Header } from '../components/Header';
-import { getPlayers, getAllMatches, saveMatch, uuid } from '../db';
-import { newTrainingState } from '../training';
+import { getPlayers, saveMatch, uuid } from '../db';
 import type { GameType, Match, Player, AtcRing } from '../types';
 
 const GAMES: { type: GameType; label: string; enabled: boolean }[] = [
   { type: '501', label: '501', enabled: true },
   { type: '301', label: '301', enabled: true },
   { type: 'AroundTheClock', label: 'Around the Clock', enabled: true },
-  { type: 'Training', label: 'Training', enabled: true },
   { type: 'Cricket', label: 'Cricket', enabled: false },
 ];
 
@@ -77,15 +75,9 @@ export function Setup() {
   }, [mainId]);
 
   const isAtc = gameType === 'AroundTheClock';
-  const isTraining = gameType === 'Training';
 
   function togglePlayer(id: string, checked: boolean) {
     if (checked) {
-      // Training is strictly solo — picking a player replaces the selection.
-      if (isTraining) {
-        setSelected([id]);
-        return;
-      }
       if (selected.length >= 4) {
         toast('Max 4 players', 'error');
         return;
@@ -96,35 +88,10 @@ export function Setup() {
     }
   }
 
-  function selectGameType(type: GameType) {
-    setGameType(type);
-    if (type === 'Training') setSelected((s) => s.slice(0, 1));
-  }
-
   async function startMatch() {
     if (selected.length < 1) {
       toast('Select at least one player', 'error');
       return;
-    }
-    // Training never ends — starting it continues the player's ongoing record
-    // when one exists (the live screen handles the day rollover).
-    if (isTraining) {
-      try {
-        const existing = (await getAllMatches()).find(
-          (m) =>
-            m.gameType === 'Training' &&
-            m.status === 'in_progress' &&
-            m.playerIds[0] === selected[0],
-        );
-        if (existing) {
-          navigate(`/live/${existing.id}`);
-          return;
-        }
-      } catch (err) {
-        console.error(err);
-        toast('Could not check for an ongoing training. Try again.', 'error');
-        return;
-      }
     }
     const matchId = uuid();
     const match: Match = {
@@ -133,10 +100,9 @@ export function Setup() {
       gameType,
       playerIds: [...selected],
       winnerId: null,
-      format: { legs: isTraining ? 1 : legs, sets: 1 },
-      doubleOut: isTraining ? false : doubleOut,
+      format: { legs, sets: 1 },
+      doubleOut,
       atcRing: isAtc ? ring : undefined,
-      training: isTraining ? newTrainingState() : undefined,
       status: 'in_progress',
       legs: [{ id: uuid(), matchId, winnerId: null, turns: [] }],
     };
@@ -164,7 +130,7 @@ export function Setup() {
               aria-pressed={g.type === gameType}
               disabled={!g.enabled}
               title={g.enabled ? '' : 'Coming soon'}
-              onClick={() => selectGameType(g.type)}
+              onClick={() => setGameType(g.type)}
             >
               {g.enabled ? g.label : `${g.label} (soon)`}
             </button>
@@ -172,19 +138,8 @@ export function Setup() {
         </div>
       </section>
 
-      {isTraining && (
-        <section className="card">
-          <p className="muted">
-            Endless solo target practice: a shuffled bag deals every field on the board (singles,
-            doubles, trebles, outer and bull) and you throw until you hit each one. Hitting all 62
-            completes a round and the next bag starts on your next throw — starting here simply
-            continues where you left off.
-          </p>
-        </section>
-      )}
-
       <section className="card">
-        <h2 className="card-title">{isTraining ? 'Player' : 'Players (1–4)'}</h2>
+        <h2 className="card-title">Players (1–4)</h2>
         {players.length === 0 ? (
           <p className="muted">No players yet — add some on the Home screen first.</p>
         ) : (
@@ -219,25 +174,23 @@ export function Setup() {
         )}
       </section>
 
-      {!isTraining && (
-        <section className="card">
-          <h2 className="card-title">Format</h2>
-          <div className="chip-row">
-            {FORMATS.map((f) => (
-              <button
-                key={f.legs}
-                className={`chip ${f.legs === legs ? 'active' : ''}`}
-                aria-pressed={f.legs === legs}
-                onClick={() => setLegs(f.legs)}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+      <section className="card">
+        <h2 className="card-title">Format</h2>
+        <div className="chip-row">
+          {FORMATS.map((f) => (
+            <button
+              key={f.legs}
+              className={`chip ${f.legs === legs ? 'active' : ''}`}
+              aria-pressed={f.legs === legs}
+              onClick={() => setLegs(f.legs)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
-      {!isAtc && !isTraining && (
+      {!isAtc && (
         <section className="card">
           <label className="toggle-row">
             <span>Double Out</span>
@@ -273,7 +226,7 @@ export function Setup() {
       )}
 
       <button className="btn primary big full" onClick={startMatch}>
-        {isTraining ? 'Start Training' : 'Start Match'}
+        Start Match
       </button>
     </div>
   );

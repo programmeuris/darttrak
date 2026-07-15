@@ -202,7 +202,8 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-.home-actions .primary {
+.home-actions .primary,
+.home-actions .full-row {
   grid-column: 1 / -1;
 }
 

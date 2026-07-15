@@ -507,31 +507,64 @@ describe('screens render without crashing', () => {
     expect(location.hash).toBe(`#/live/${fresh!.id}`);
   });
 
-  it('Setup configures Training as strictly solo with no match options', async () => {
+  it('Home starts (and later continues) the main player’s training', async () => {
+    const alice = await addPlayer('Alice');
+    await addPlayer('Bob');
+    localStorage.setItem('darttrak:mainPlayer', alice.id);
+
+    render(<Home />);
+    await screen.findByText('Alice');
+    fireEvent.click(screen.getByRole('button', { name: '🎓 Training' }));
+
+    let roundId = '';
+    await waitFor(async () => {
+      const rounds = (await getAllMatches()).filter((m) => m.gameType === 'Training');
+      expect(rounds).toHaveLength(1);
+      expect(rounds[0].playerIds).toEqual([alice.id]);
+      expect(1 + rounds[0].training!.bag.length).toBe(62);
+      roundId = rounds[0].id;
+    });
+    expect(location.hash).toBe(`#/live/${roundId}`);
+
+    // Pressing again continues the same round instead of creating another.
+    cleanup();
+    location.hash = '';
+    render(<Home />);
+    await screen.findByText('Alice');
+    fireEvent.click(screen.getByRole('button', { name: '🎓 Training' }));
+    await waitFor(() => expect(location.hash).toBe(`#/live/${roundId}`));
+    expect((await getAllMatches()).filter((m) => m.gameType === 'Training')).toHaveLength(1);
+  });
+
+  it('Home training needs a main player when several exist, and Setup has no Training option', async () => {
     await addPlayer('Alice');
     await addPlayer('Bob');
+    render(<Home />);
+    await screen.findByText('Alice');
+    fireEvent.click(screen.getByRole('button', { name: '🎓 Training' }));
+
+    await waitFor(() =>
+      expect(document.getElementById('toast')!.textContent).toContain('Star a main player'),
+    );
+    expect((await getAllMatches()).filter((m) => m.gameType === 'Training')).toHaveLength(0);
+    cleanup();
+
+    // Training is not a match: it doesn't appear in match setup.
     render(<Setup />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Training' }));
+    await screen.findByText('Game Type');
+    expect(screen.queryByRole('button', { name: 'Training' })).toBeNull();
+  });
 
-    // No format / double-out ceremony, and the player section is singular.
-    expect(screen.queryByText('Format')).toBeNull();
-    expect(screen.queryByText('Double Out')).toBeNull();
-    expect(screen.getByText('Player')).toBeTruthy();
+  it('Profile starts training for that specific player', async () => {
+    await addPlayer('Alice');
+    const bob = await addPlayer('Bob');
+    render(<Profile playerId={bob.id} />);
+    fireEvent.click(await screen.findByRole('button', { name: '🎓 Training' }));
 
-    // Picking a second player replaces the first instead of adding.
-    const aliceLabel = screen.getByText('Alice').closest('label')!;
-    const bobLabel = screen.getByText('Bob').closest('label')!;
-    fireEvent.click(aliceLabel.querySelector('input')!);
-    fireEvent.click(bobLabel.querySelector('input')!);
-    expect(aliceLabel.querySelector('.order-badge')).toBeNull();
-    expect(bobLabel.querySelector('.order-badge')!.textContent).toBe('1');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Start Training' }));
     await waitFor(async () => {
-      const created = (await getAllMatches()).find((x) => x.gameType === 'Training');
-      expect(created).toBeTruthy();
-      expect(created!.playerIds).toHaveLength(1);
-      expect(1 + created!.training!.bag.length).toBe(62);
+      const rounds = (await getAllMatches()).filter((m) => m.gameType === 'Training');
+      expect(rounds).toHaveLength(1);
+      expect(rounds[0].playerIds).toEqual([bob.id]);
     });
   });
 
