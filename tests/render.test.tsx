@@ -483,7 +483,7 @@ describe('screens render without crashing', () => {
     fireEvent.click(screen.getByRole('button', { name: '1' }));
     fireEvent.click(screen.getByRole('button', { name: '2' }));
     expect(screen.getByText('+12 misses')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '↵ Add misses' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add misses' }));
     await waitFor(async () =>
       expect((await getMatch('t-pad'))!.legs[0].turns[0].darts).toHaveLength(12),
     );
