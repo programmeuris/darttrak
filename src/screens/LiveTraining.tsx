@@ -23,6 +23,9 @@ const UNDO_CONFIRM_MS = 3000;
 export function LiveTraining({ matchId }: { matchId: string }) {
   const [match, setMatch] = useState<Match | null>(null);
   const [playerName, setPlayerName] = useState('');
+  // Bumped on every registered entry; the flash overlay is keyed by it so the
+  // "darts landed" animation replays even when adds come in quick succession.
+  const [flashKey, setFlashKey] = useState(0);
   // Numpad buffer: digits accumulate and commit on ↵ (or on HIT, which
   // registers the typed misses first so one tap closes the whole streak).
   const [pending, setPending] = useState('');
@@ -145,6 +148,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
 
       await saveMatch(next);
       setPending('');
+      setFlashKey((k) => k + 1);
       if (finishedRound) {
         const darts = trainingAttempts(next).reduce((acc, a) => acc + a.darts, 0);
         const fresh = newTrainingRound(next.playerIds[0]);
@@ -249,6 +253,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
       </header>
 
       <div className="score-card active">
+        {flashKey > 0 && <div key={flashKey} className="sc-flash" aria-hidden="true" />}
         <div className="sc-top">
           <span className="sc-name">Current target</span>
           {openDarts > 0 && <span className="sc-legs">{openDarts} thrown</span>}

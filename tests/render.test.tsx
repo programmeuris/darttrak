@@ -446,13 +446,16 @@ describe('screens render without crashing', () => {
     m.training = { target: 'T18', bag: ['S5'] };
     await saveMatch(m);
 
-    render(<LiveTraining matchId="t-live" />);
+    const { container } = render(<LiveTraining matchId="t-live" />);
     expect(await screen.findByText('T18')).toBeTruthy();
+    expect(container.querySelector('.sc-flash')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'MISS ✗' }));
     await waitFor(async () =>
       expect((await getMatch('t-live'))!.legs[0].turns[0].darts).toHaveLength(1),
     );
+    // Registering darts flashes the target card so the entry is visibly received.
+    await waitFor(() => expect(container.querySelector('.score-card .sc-flash')).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
 
     await waitFor(async () => {
