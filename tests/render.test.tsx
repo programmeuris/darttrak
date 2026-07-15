@@ -491,7 +491,7 @@ describe('screens render without crashing', () => {
     // Digits accumulate; ↵ commits them as misses in one save.
     fireEvent.click(screen.getByRole('button', { name: '1' }));
     fireEvent.click(screen.getByRole('button', { name: '2' }));
-    expect(screen.getByText('+12 misses')).toBeTruthy();
+    expect(screen.getByText('+12 darts')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Add misses' }));
     await waitFor(async () =>
       expect((await getMatch('t-pad'))!.legs[0].turns[0].darts).toHaveLength(12),
