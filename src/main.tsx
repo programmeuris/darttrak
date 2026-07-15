@@ -5,10 +5,12 @@ import { navigate } from './router';
 import { useRoute } from './useRoute';
 import { getMatch } from './db';
 import { toast } from './toast';
+import type { GameType } from './types';
 import { Home } from './screens/Home';
 import { Setup } from './screens/Setup';
 import { Live } from './screens/Live';
 import { LiveAtc } from './screens/LiveAtc';
+import { LiveTraining } from './screens/LiveTraining';
 import { Summary } from './screens/Summary';
 import { History } from './screens/History';
 import { PlayerStats } from './screens/PlayerStats';
@@ -55,9 +57,9 @@ function Redirect({ to }: { to: string }) {
   return null;
 }
 
-/** Picks the x01 or Around the Clock live screen based on the match's game type. */
+/** Picks the live screen (x01 / Around the Clock / Training) by game type. */
 function LiveRoute({ matchId }: { matchId: string }) {
-  const [isAtc, setIsAtc] = useState<boolean | null | undefined>(undefined);
+  const [kind, setKind] = useState<GameType | null | undefined>(undefined);
   useEffect(() => {
     let active = true;
     getMatch(matchId)
@@ -65,31 +67,29 @@ function LiveRoute({ matchId }: { matchId: string }) {
         if (!active) return;
         if (!m) {
           toast('Match not found', 'error');
-          setIsAtc(null);
+          setKind(null);
           return;
         }
-        setIsAtc(m.gameType === 'AroundTheClock');
+        setKind(m.gameType);
       })
       .catch((err) => {
         // Without this a rejected read strands the user on a blank screen.
         if (!active) return;
         console.error(err);
         toast('Failed to load the match', 'error');
-        setIsAtc(null);
+        setKind(null);
       });
     return () => {
       active = false;
     };
   }, [matchId]);
 
-  if (isAtc === undefined) return <div className="screen" />;
-  if (isAtc === null) return <Redirect to="/" />;
+  if (kind === undefined) return <div className="screen" />;
+  if (kind === null) return <Redirect to="/" />;
   // key={matchId} so switching matches resets the live screen's input state.
-  return isAtc ? (
-    <LiveAtc key={matchId} matchId={matchId} />
-  ) : (
-    <Live key={matchId} matchId={matchId} />
-  );
+  if (kind === 'AroundTheClock') return <LiveAtc key={matchId} matchId={matchId} />;
+  if (kind === 'Training') return <LiveTraining key={matchId} matchId={matchId} />;
+  return <Live key={matchId} matchId={matchId} />;
 }
 
 function Screen({ name, params }: { name: string; params: string[] }) {

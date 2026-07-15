@@ -13,6 +13,7 @@ import {
   totalDartsThrown,
 } from '../scoring';
 import { atcDartsThrown, atcHits, atcHitRate, atcFewestDartsToComplete, atcRingLabel } from '../atc';
+import { TRAINING_FIELD_COUNT, trainingRounds } from '../training';
 import type { Match, Player } from '../types';
 
 export function Summary({ matchId }: { matchId: string }) {
@@ -49,11 +50,24 @@ export function Summary({ matchId }: { matchId: string }) {
 
   const nameOf = (id: string) => names.get(id) ?? 'Unknown';
   const isAtc = match.gameType === 'AroundTheClock';
-  const subtitle = isAtc
-    ? `Around the Clock · ${atcRingLabel(match.atcRing ?? 'single')} · Best of ${match.format.legs}`
-    : `${match.gameType} · Best of ${match.format.legs} · ${match.doubleOut ? 'Double Out' : 'Straight Out'}`;
+  const isTraining = match.gameType === 'Training';
+  const subtitle = isTraining
+    ? `Training round · ${new Date(match.date).toLocaleDateString()}`
+    : isAtc
+      ? `Around the Clock · ${atcRingLabel(match.atcRing ?? 'single')} · Best of ${match.format.legs}`
+      : `${match.gameType} · Best of ${match.format.legs} · ${match.doubleOut ? 'Double Out' : 'Straight Out'}`;
 
   function rowsFor(id: string): [string, string][] {
+    if (isTraining) {
+      const round = trainingRounds([match!], id)[0];
+      if (!round) return [];
+      return [
+        ['Fields Hit', `${round.resolved}/${TRAINING_FIELD_COUNT}`],
+        ['Darts Thrown', String(round.darts)],
+        ['Avg Darts / Target', round.avgDarts > 0 ? round.avgDarts.toFixed(1) : '—'],
+        ['First-dart Hit %', `${round.firstDartHitRate.toFixed(0)}%`],
+      ];
+    }
     if (isAtc) {
       const fewest = atcFewestDartsToComplete(match!.legs, id);
       return [
@@ -82,16 +96,21 @@ export function Summary({ matchId }: { matchId: string }) {
       <Header title="Match Summary" onBack={() => navigate('/')} />
 
       <section className="card winner-banner">
-        <div className="winner-label">Winner</div>
-        <div className="winner-name">🏆 {match.winnerId ? nameOf(match.winnerId) : '—'}</div>
+        <div className="winner-label">{isTraining ? 'Training' : 'Winner'}</div>
+        <div className="winner-name">
+          {isTraining ? `🎯 ${nameOf(match.playerIds[0])}` : `🏆 ${match.winnerId ? nameOf(match.winnerId) : '—'}`}
+        </div>
         <div className="muted">{subtitle}</div>
       </section>
 
       {match.playerIds.map((id) => (
-        <section className={`card ${id === match.winnerId ? 'winner-card' : ''}`} key={id}>
+        <section
+          className={`card ${!isTraining && id === match.winnerId ? 'winner-card' : ''}`}
+          key={id}
+        >
           <h2 className="card-title">
             {nameOf(id)}
-            {id === match.winnerId && <span className="badge"> 🏆 Winner</span>}
+            {!isTraining && id === match.winnerId && <span className="badge"> 🏆 Winner</span>}
           </h2>
           <StatGrid rows={rowsFor(id)} />
         </section>

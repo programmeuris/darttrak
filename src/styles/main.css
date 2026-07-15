@@ -621,6 +621,15 @@ body {
   grid-template-columns: 2fr 1fr;
   gap: 8px;
 }
+/* Training numpad: the pending miss count being typed (committed on ↵). */
+.pad-display {
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px;
+}
 .num-btn.wide {
   font-size: 1rem;
 }

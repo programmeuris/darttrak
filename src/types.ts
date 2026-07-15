@@ -1,4 +1,4 @@
-export type GameType = '501' | '301' | 'Cricket' | 'AroundTheClock';
+export type GameType = '501' | '301' | 'Cricket' | 'AroundTheClock' | 'Training';
 export type MatchStatus = 'in_progress' | 'completed';
 
 /**
@@ -50,6 +50,9 @@ export interface Match {
   };
   doubleOut: boolean;
   atcRing?: AtcRing; // only set for Around the Clock matches
+  // Training mode only: the live target and the remainder of the shuffle bag,
+  // persisted so a reload never reshuffles mid-bag.
+  training?: { target: string; bag: string[] };
   status: MatchStatus;
   legs: Leg[];
 }
