@@ -28,8 +28,11 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   const [pending, setPending] = useState('');
   const submitting = useRef(false);
   const [saving, setSaving] = useState(false);
-  const [undoArmed, setUndoArmed] = useState(false);
+  const [undoArmed, setUndoArmed] = useState<'dart' | 'action' | null>(null);
   const undoArmTimer = useRef<number | undefined>(undefined);
+  // How many darts the last numpad entry added. Undo Action reverts exactly
+  // that many; any other edit (an undo, a remount) invalidates the memory.
+  const [lastAction, setLastAction] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -81,19 +84,20 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   function disarmUndo() {
     window.clearTimeout(undoArmTimer.current);
     undoArmTimer.current = undefined;
-    setUndoArmed(false);
+    setUndoArmed(null);
   }
 
-  function pressUndo() {
+  function pressUndo(kind: 'dart' | 'action') {
     if (!match || saving) return;
-    if (!undoArmed) {
-      setUndoArmed(true);
+    if (undoArmed !== kind) {
+      setUndoArmed(kind);
       window.clearTimeout(undoArmTimer.current);
-      undoArmTimer.current = window.setTimeout(() => setUndoArmed(false), UNDO_CONFIRM_MS);
+      undoArmTimer.current = window.setTimeout(() => setUndoArmed(null), UNDO_CONFIRM_MS);
       return;
     }
     disarmUndo();
-    void undoDart();
+    if (kind === 'dart') void undoDart();
+    else void undoAction();
   }
 
   async function registerDarts(misses: number, hit: boolean) {
@@ -153,6 +157,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         navigate(`/live/${fresh.id}`, { replace: true });
         return;
       }
+      setLastAction(misses + (hit ? 1 : 0));
       setMatch(next);
     } catch (err) {
       console.error(err);
@@ -216,6 +221,43 @@ export function LiveTraining({ matchId }: { matchId: string }) {
       if (turn.darts.length === 0) nextLeg.turns.pop();
       else turn.totalScore = turn.darts.length;
       await saveMatch(next);
+      setLastAction(0);
+      setMatch(next);
+    } catch (err) {
+      console.error(err);
+      toast('Save failed — the undo was not applied. Try again.', 'error');
+    } finally {
+      submitting.current = false;
+      setSaving(false);
+    }
+  }
+
+  // Reverts the whole last numpad entry in one save. Its darts are still the
+  // tail of the last turn: `lastAction` is only ever set by a registerDarts
+  // that stayed on this round, and every undo path clears it.
+  async function undoAction() {
+    if (!match || submitting.current || lastAction <= 0) return;
+    submitting.current = true;
+    setSaving(true);
+    try {
+      const next = structuredClone(match);
+      const nextLeg = next.legs[next.legs.length - 1];
+      const turn = nextLeg.turns[nextLeg.turns.length - 1];
+      for (let i = 0; i < lastAction; i++) {
+        const popped = turn.darts.pop()!;
+        if (popped.score > 0) {
+          // The entry's hit comes off first: its target becomes live again
+          // and the freshly drawn one goes back to the front of the bag.
+          next.training = {
+            target: fieldIdFromLabel(popped.label),
+            bag: [next.training!.target, ...next.training!.bag],
+          };
+        }
+      }
+      if (turn.darts.length === 0) nextLeg.turns.pop();
+      else turn.totalScore = turn.darts.length;
+      await saveMatch(next);
+      setLastAction(0);
       setMatch(next);
     } catch (err) {
       console.error(err);
@@ -318,11 +360,18 @@ export function LiveTraining({ matchId }: { matchId: string }) {
 
       <div className="undo-turn-row">
         <button
-          className={`btn ${undoArmed ? 'danger' : 'ghost'}`}
+          className={`btn ${undoArmed === 'dart' ? 'danger' : 'ghost'}`}
           disabled={saving}
-          onClick={pressUndo}
+          onClick={() => pressUndo('dart')}
         >
-          {undoArmed ? 'Tap again to undo dart' : '↶ Undo Dart'}
+          {undoArmed === 'dart' ? 'Tap again to undo dart' : '↶ Undo Dart'}
+        </button>
+        <button
+          className={`btn ${undoArmed === 'action' ? 'danger' : 'ghost'}`}
+          disabled={saving || lastAction === 0}
+          onClick={() => pressUndo('action')}
+        >
+          {undoArmed === 'action' ? 'Tap again to undo action' : '↶ Undo Action'}
         </button>
       </div>
 
