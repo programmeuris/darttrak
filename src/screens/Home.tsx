@@ -8,10 +8,13 @@ import {
   exportAllData,
   importAllData,
 } from '../db';
+import { readMainPlayer, writeMainPlayer } from '../prefs';
+import { startOrContinueTraining } from '../trainingSession';
 import type { Player, ExportBundle } from '../types';
 
 export function Home() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [mainId, setMainId] = useState<string | null>(() => readMainPlayer());
   const [name, setName] = useState('');
   const [pendingDelete, setPendingDelete] = useState<Player | null>(null);
   const [exportedBeforeDelete, setExportedBeforeDelete] = useState(false);
@@ -87,6 +90,37 @@ export function Home() {
     setPendingDelete(p);
   }
 
+  // Training isn't a match, so it starts from Home rather than match setup:
+  // straight into the main player's ongoing round (or the only player's).
+  async function startTraining() {
+    const target =
+      players.find((p) => p.id === mainId) ?? (players.length === 1 ? players[0] : null);
+    if (!target) {
+      toast(
+        players.length === 0
+          ? 'Add a player first'
+          : 'Star a main player to start training from here',
+        'error',
+      );
+      return;
+    }
+    try {
+      navigate(`/live/${await startOrContinueTraining(target.id)}`);
+    } catch (err) {
+      console.error(err);
+      toast('Could not start training. Try again.', 'error');
+    }
+  }
+
+  // Only one main player exists per device; starring someone else moves the
+  // star, starring the current main removes it.
+  function toggleMain(p: Player) {
+    const next = mainId === p.id ? null : p.id;
+    setMainId(next);
+    writeMainPlayer(next);
+    toast(next ? `${p.name} is now the main player` : 'Main player cleared');
+  }
+
   async function confirmDelete() {
     if (!pendingDelete) return;
     const { id, name } = pendingDelete;
@@ -97,6 +131,10 @@ export function Home() {
       console.error(err);
       toast('Delete failed — nothing was removed. Try again.', 'error');
       return;
+    }
+    if (mainId === id) {
+      setMainId(null);
+      writeMainPlayer(null);
     }
     await refresh();
     toast(`Deleted ${name} and their matches`);
@@ -156,6 +194,9 @@ export function Home() {
         <button className="btn primary big" onClick={() => navigate('/setup')}>
           🎯 New Match
         </button>
+        <button className="btn big full-row" onClick={startTraining}>
+          🎓 Training
+        </button>
       </div>
 
       <section className="card">
@@ -166,6 +207,18 @@ export function Home() {
           ) : (
             players.map((p) => (
               <li className="roster-item" key={p.id}>
+                <button
+                  className={`icon-btn star ${mainId === p.id ? 'active' : ''}`}
+                  aria-label={
+                    mainId === p.id
+                      ? `${p.name} is the main player — tap to clear`
+                      : `Make ${p.name} the main player`
+                  }
+                  aria-pressed={mainId === p.id}
+                  onClick={() => toggleMain(p)}
+                >
+                  {mainId === p.id ? '★' : '☆'}
+                </button>
                 <button
                   className="roster-name"
                   aria-label={`Open ${p.name}'s profile`}

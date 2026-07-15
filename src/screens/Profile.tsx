@@ -3,6 +3,7 @@ import { navigate } from '../router';
 import { toast } from '../toast';
 import { Header } from '../components/Header';
 import { getPlayer, getMatchesByPlayer } from '../db';
+import { startOrContinueTraining } from '../trainingSession';
 import type { Player } from '../types';
 
 /**
@@ -54,6 +55,19 @@ export function Profile({ playerId }: { playerId: string }) {
       <div className="home-actions">
         <button className="btn primary big" onClick={() => navigate(`/player/${playerId}/stats`)}>
           📊 Analytics
+        </button>
+        <button
+          className="btn"
+          onClick={async () => {
+            try {
+              navigate(`/live/${await startOrContinueTraining(playerId)}`);
+            } catch (err) {
+              console.error(err);
+              toast('Could not start training. Try again.', 'error');
+            }
+          }}
+        >
+          🎓 Training
         </button>
         <button className="btn" onClick={() => navigate(`/player/${playerId}/history`)}>
           History

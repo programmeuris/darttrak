@@ -4,7 +4,7 @@ import { Line, Bar } from 'react-chartjs-2';
 import type { ChartData, ChartDataset, ChartOptions, TooltipItem } from 'chart.js';
 import { navigate } from '../router';
 import { toast } from '../toast';
-import { readPref, writePref } from '../prefs';
+import { readMainPlayer, readPref, writePref } from '../prefs';
 import { Header, StatCell } from '../components/Header';
 import { getPlayers, getAllMatches } from '../db';
 import { computePlayerOverview, averagePerMatch, scoreDistribution, x01PersonalBests } from '../stats';
@@ -363,7 +363,11 @@ export function PlayerStats({ playerId: lockedId }: { playerId?: string } = {}) 
       .then(([ps, ms]) => {
         setPlayers(ps);
         setMatches(ms);
-        if (!lockedId && ps.length) setSelectedId(ps[0].id);
+        // Default the picker to the device's main player when one is set.
+        const main = readMainPlayer();
+        if (!lockedId && ps.length) {
+          setSelectedId(main && ps.some((p) => p.id === main) ? main : ps[0].id);
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -1059,7 +1063,7 @@ function AtcTargets({
 function Training({ matches, playerId }: { matches: Match[]; playerId: string }) {
   const rounds = trainingRounds(matches, playerId);
   if (rounds.length === 0) {
-    return <Empty text="No training recorded yet — start one from New Match." />;
+    return <Empty text="No training recorded yet — start one from the Home screen." />;
   }
 
   const best = trainingBestRound(matches, playerId);

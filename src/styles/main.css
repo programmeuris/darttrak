@@ -178,6 +178,21 @@ body {
   min-width: 40px;
   font-size: 1rem;
 }
+/* Main-player star toggle on the roster (one per device). */
+.icon-btn.star {
+  background: transparent;
+  color: var(--muted);
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  font-size: 1.25rem;
+}
+.icon-btn.star.active {
+  color: #f5c451;
+}
+.main-star {
+  color: #f5c451;
+}
 .icon-btn:active {
   transform: scale(0.94);
 }
@@ -187,7 +202,8 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-.home-actions .primary {
+.home-actions .primary,
+.home-actions .full-row {
   grid-column: 1 / -1;
 }
 
