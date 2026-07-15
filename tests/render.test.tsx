@@ -76,33 +76,54 @@ describe('screens render without crashing', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it('Home stars exactly one main player per device and Setup preselects them', async () => {
+  it('Profile sets the main player; the roster leads with them, starred and divided', async () => {
     await addPlayer('Alice');
-    await addPlayer('Bob');
-    const { unmount } = render(<Home />);
+    const bob = await addPlayer('Bob');
 
-    // Star Alice, then Bob — the star moves; only one main player exists.
-    fireEvent.click(await screen.findByLabelText('Make Alice the main player'));
-    expect(screen.getByLabelText('Alice is the main player — tap to clear')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Make Bob the main player'));
-    expect(screen.getByLabelText('Make Alice the main player')).toBeTruthy();
-    expect(screen.getByLabelText('Bob is the main player — tap to clear')).toBeTruthy();
+    // The setting lives on the player's own page, not in the roster list.
+    const { unmount } = render(<Profile playerId={bob.id} />);
+    fireEvent.click(await screen.findByRole('button', { name: '☆ Set as main player' }));
+    expect(screen.getByRole('button', { name: '★ Main player' })).toBeTruthy();
     unmount();
 
-    // New game: Bob is preselected (throw-order badge 1) and starred.
+    // Roster: Bob first with a star and the divider class; Alice unstarred,
+    // with no empty-star placeholder anywhere.
+    const { container, unmount: unmountHome } = render(<Home />);
+    await screen.findByText('Bob');
+    const rows = Array.from(container.querySelectorAll('.roster-item'));
+    expect(rows[0].textContent).toContain('Bob');
+    expect(rows[0].className).toContain('roster-main');
+    expect(rows[0].querySelector('.main-star')).toBeTruthy();
+    expect(rows[1].querySelector('.main-star')).toBeNull();
+    expect(screen.queryByText('☆')).toBeNull();
+    unmountHome();
+
+    // New game: Bob is listed first, preselected (throw-order 1) and starred.
     render(<Setup />);
     const bobLabel = (await screen.findByText('Bob')).closest('label')!;
     await waitFor(() => expect(bobLabel.querySelector('.order-badge')!.textContent).toBe('1'));
     expect(bobLabel.querySelector('.main-star')).toBeTruthy();
-    expect(
-      (await screen.findByText('Alice')).closest('label')!.querySelector('.order-badge'),
-    ).toBeNull();
+    const names = Array.from(document.querySelectorAll('.check-name')).map(
+      (el) => el.textContent,
+    );
+    expect(names[0]).toContain('Bob');
+  });
+
+  it('Profile clears the main player again on a second press', async () => {
+    const alice = await addPlayer('Alice');
+    localStorage.setItem('darttrak:mainPlayer', alice.id);
+    render(<Profile playerId={alice.id} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '★ Main player' }));
+    expect(screen.getByRole('button', { name: '☆ Set as main player' })).toBeTruthy();
+    expect(localStorage.getItem('darttrak:mainPlayer')).toBeNull();
   });
 
   it('Home clears the main player when they are deleted', async () => {
-    await addPlayer('Alice');
+    const alice = await addPlayer('Alice');
+    localStorage.setItem('darttrak:mainPlayer', alice.id);
     render(<Home />);
-    fireEvent.click(await screen.findByLabelText('Make Alice the main player'));
+    await screen.findByText('Alice');
 
     fireEvent.click(screen.getByLabelText('Delete Alice'));
     fireEvent.click(screen.getByText('Delete'));
