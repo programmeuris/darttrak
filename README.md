@@ -33,9 +33,10 @@ Two reasons:
   per-round darts-per-target and first-dart hit % with rolling averages and
   trend deltas, a dated fewest-darts-per-round personal best, and a
   Single/Double/Treble hit-% matrix for every field.
-- **1–4 players** per match, drawn from a saved roster; star one as the
-  device's **main player** and they're preselected for every new game and the
-  default on the stats screen
+- **1–4 players** per match, drawn from a saved roster; mark one as the
+  device's **main player** from their profile page and they lead the roster
+  with a star, are preselected for every new game, and are the default on the
+  stats screen
 - **Live scoring** screen optimised for mobile: large tap targets, segmented
   multiplier numpad (Single / Double / Treble + Outer/Bull + Miss), real-time bust and
   checkout detection, **checkout suggestions** (e.g. "T20 · T20 · Bull" that

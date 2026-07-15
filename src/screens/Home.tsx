@@ -30,6 +30,11 @@ export function Home() {
         console.error(err);
         toast('Failed to load players', 'error');
       });
+
+  // Main player first, the rest in roster (alphabetical) order.
+  const ordered = mainId
+    ? [...players].sort((a, b) => (b.id === mainId ? 1 : 0) - (a.id === mainId ? 1 : 0))
+    : players;
   useEffect(() => {
     refresh();
   }, []);
@@ -110,15 +115,6 @@ export function Home() {
       console.error(err);
       toast('Could not start training. Try again.', 'error');
     }
-  }
-
-  // Only one main player exists per device; starring someone else moves the
-  // star, starring the current main removes it.
-  function toggleMain(p: Player) {
-    const next = mainId === p.id ? null : p.id;
-    setMainId(next);
-    writeMainPlayer(next);
-    toast(next ? `${p.name} is now the main player` : 'Main player cleared');
   }
 
   async function confirmDelete() {
@@ -205,26 +201,29 @@ export function Home() {
           {players.length === 0 ? (
             <li className="empty">No players yet. Add one below.</li>
           ) : (
-            players.map((p) => (
-              <li className="roster-item" key={p.id}>
-                <button
-                  className={`icon-btn star ${mainId === p.id ? 'active' : ''}`}
-                  aria-label={
-                    mainId === p.id
-                      ? `${p.name} is the main player — tap to clear`
-                      : `Make ${p.name} the main player`
-                  }
-                  aria-pressed={mainId === p.id}
-                  onClick={() => toggleMain(p)}
-                >
-                  {mainId === p.id ? '★' : '☆'}
-                </button>
+            ordered.map((p) => (
+              // The main player leads the roster; a divider separates them
+              // from the rest. The star is display-only here — it's set from
+              // the player's own profile, so it can't be flipped by accident.
+              <li
+                className={`roster-item ${
+                  mainId === p.id && ordered.length > 1 ? 'roster-main' : ''
+                }`}
+                key={p.id}
+              >
                 <button
                   className="roster-name"
-                  aria-label={`Open ${p.name}'s profile`}
+                  aria-label={`Open ${p.name}'s profile${mainId === p.id ? ' (main player)' : ''}`}
                   onClick={() => navigate(`/player/${p.id}`)}
                 >
-                  {p.name}
+                  <span>
+                    {mainId === p.id && (
+                      <span className="main-star" aria-hidden="true">
+                        ★{' '}
+                      </span>
+                    )}
+                    {p.name}
+                  </span>
                   <span className="roster-chevron" aria-hidden="true">
                     ›
                   </span>

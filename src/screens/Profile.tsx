@@ -3,6 +3,7 @@ import { navigate } from '../router';
 import { toast } from '../toast';
 import { Header } from '../components/Header';
 import { getPlayer, getMatchesByPlayer } from '../db';
+import { readMainPlayer, writeMainPlayer } from '../prefs';
 import { startOrContinueTraining } from '../trainingSession';
 import type { Player } from '../types';
 
@@ -14,6 +15,18 @@ import type { Player } from '../types';
 export function Profile({ playerId }: { playerId: string }) {
   const [player, setPlayer] = useState<Player | null>(null);
   const [matchCount, setMatchCount] = useState(0);
+  const [isMain, setIsMain] = useState(() => readMainPlayer() === playerId);
+
+  // The main-player setting lives here, on the player's own page, rather than
+  // as a tap target in the roster list — deliberate to set, hard to fat-finger.
+  // Setting it silently takes the star from whoever held it (one per device).
+  function toggleMain() {
+    if (!player) return;
+    const next = !isMain;
+    setIsMain(next);
+    writeMainPlayer(next ? playerId : null);
+    toast(next ? `${player.name} is now the main player` : 'Main player cleared');
+  }
 
   useEffect(() => {
     let active = true;
@@ -71,6 +84,9 @@ export function Profile({ playerId }: { playerId: string }) {
         </button>
         <button className="btn" onClick={() => navigate(`/player/${playerId}/history`)}>
           History
+        </button>
+        <button className="btn" aria-pressed={isMain} onClick={toggleMain}>
+          {isMain ? '★ Main player' : '☆ Set as main player'}
         </button>
         <button className="btn" disabled title="Coming soon">
           Settings · coming soon

@@ -62,8 +62,12 @@ export function Setup() {
   useEffect(() => {
     getPlayers()
       .then((ps) => {
-        setPlayers(ps);
-        // The device's main player starts every new game preselected.
+        // Main player first (and preselected), the rest in roster order.
+        setPlayers(
+          mainId
+            ? [...ps].sort((a, b) => (b.id === mainId ? 1 : 0) - (a.id === mainId ? 1 : 0))
+            : ps,
+        );
         if (mainId && ps.some((p) => p.id === mainId)) {
           setSelected((s) => (s.length === 0 ? [mainId] : s));
         }

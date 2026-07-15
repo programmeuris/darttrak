@@ -178,18 +178,7 @@ body {
   min-width: 40px;
   font-size: 1rem;
 }
-/* Main-player star toggle on the roster (one per device). */
-.icon-btn.star {
-  background: transparent;
-  color: var(--muted);
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  font-size: 1.25rem;
-}
-.icon-btn.star.active {
-  color: #f5c451;
-}
+/* Main-player star (display-only; the setting lives on the profile page). */
 .main-star {
   color: #f5c451;
 }
@@ -278,6 +267,20 @@ body {
   background: var(--surface-2);
   border-radius: 10px;
   padding: 8px 8px 8px 14px;
+}
+/* The main player leads the roster; the extra gap and hairline underneath
+   act as the divider between them and everyone else. */
+.roster-item.roster-main {
+  margin-bottom: 10px;
+  position: relative;
+}
+.roster-item.roster-main::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: -6px;
+  border-bottom: 1px solid var(--surface-2);
 }
 .roster-name {
   flex: 1;
