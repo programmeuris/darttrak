@@ -461,6 +461,16 @@ describe('screens render without crashing', () => {
       expect(saved!.legs[0].turns[0].darts.map((d) => d.score)).toEqual([0, 1]);
       expect(saved!.training!.target).toBe('S5'); // next field dealt from the bag
     });
+
+    // Undoing a dart takes a confirming second tap, like the other live screens.
+    fireEvent.click(screen.getByRole('button', { name: '↶ Undo Dart' }));
+    expect((await getMatch('t-live'))!.legs[0].turns[0].darts).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Tap again to undo dart' }));
+    await waitFor(async () => {
+      const saved = await getMatch('t-live');
+      expect(saved!.legs[0].turns[0].darts.map((d) => d.score)).toEqual([0]);
+      expect(saved!.training!.target).toBe('T18'); // the undone hit's target is live again
+    });
   });
 
   it('LiveTraining numpad commits typed misses on enter and flushes them on HIT', async () => {
@@ -477,7 +487,6 @@ describe('screens render without crashing', () => {
 
     render(<LiveTraining matchId="t-pad" />);
     await screen.findByText('D10');
-    fireEvent.click(screen.getByRole('button', { name: 'Numpad' }));
 
     // Digits accumulate; ↵ commits them as misses in one save.
     fireEvent.click(screen.getByRole('button', { name: '1' }));
@@ -514,7 +523,8 @@ describe('screens render without crashing', () => {
     await saveMatch(m);
 
     render(<LiveTraining matchId="t-final" />);
-    await screen.findByText('3');
+    // '3' matches the numpad's digit too — pin the lookup to the target card.
+    await screen.findByText('3', { selector: '.sc-target' });
     fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
 
     await waitFor(async () => {

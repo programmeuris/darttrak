@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../router';
 import { toast } from '../toast';
 import { getMatch, getPlayers, getAllMatches, saveMatch, deleteMatch } from '../db';
-import { readPref, writePref } from '../prefs';
 import {
   TRAINING_FIELD_COUNT,
   advanceTraining,
@@ -18,6 +17,8 @@ import type { Match, Player, Turn } from '../types';
 
 // Sanity cap on one numpad entry — beyond this it's a typo, not a cold streak.
 const MAX_PENDING_DIGITS = 3;
+// How long an armed undo stays primed before it relaxes back to safe.
+const UNDO_CONFIRM_MS = 3000;
 
 export function LiveTraining({ matchId }: { matchId: string }) {
   const [match, setMatch] = useState<Match | null>(null);
@@ -25,9 +26,10 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   // Numpad buffer: digits accumulate and commit on ↵ (or on HIT, which
   // registers the typed misses first so one tap closes the whole streak).
   const [pending, setPending] = useState('');
-  const [padMode, setPadMode] = useState(() => readPref('trainingEntry') === 'pad');
   const submitting = useRef(false);
   const [saving, setSaving] = useState(false);
+  const [undoArmed, setUndoArmed] = useState(false);
+  const undoArmTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
@@ -63,6 +65,8 @@ export function LiveTraining({ matchId }: { matchId: string }) {
     };
   }, [matchId]);
 
+  useEffect(() => () => window.clearTimeout(undoArmTimer.current), []);
+
   if (!match) return <div className="screen" />;
 
   const training = match.training!;
@@ -74,15 +78,28 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   const dartsThisRound = attempts.reduce((acc, a) => acc + a.darts, 0);
   const targetLabel = trainingFieldLabel(training.target);
 
-  function selectPad(v: boolean) {
-    setPadMode(v);
-    setPending('');
-    writePref('trainingEntry', v ? 'pad' : 'tap');
+  function disarmUndo() {
+    window.clearTimeout(undoArmTimer.current);
+    undoArmTimer.current = undefined;
+    setUndoArmed(false);
+  }
+
+  function pressUndo() {
+    if (!match || saving) return;
+    if (!undoArmed) {
+      setUndoArmed(true);
+      window.clearTimeout(undoArmTimer.current);
+      undoArmTimer.current = window.setTimeout(() => setUndoArmed(false), UNDO_CONFIRM_MS);
+      return;
+    }
+    disarmUndo();
+    void undoDart();
   }
 
   async function registerDarts(misses: number, hit: boolean) {
     if (!match || submitting.current) return;
     if (misses <= 0 && !hit) return;
+    disarmUndo();
     submitting.current = true;
     setSaving(true);
     try {
@@ -213,10 +230,11 @@ export function LiveTraining({ matchId }: { matchId: string }) {
     setPending((p) => (p.length >= MAX_PENDING_DIGITS || (p === '' && d === '0') ? p : p + d));
   }
 
+  // With nothing typed the miss button records a single miss, so the pad
+  // covers plain tap entry too. `pending` can never be '0' (leading-zero
+  // guard in pressDigit), so the count is always at least 1.
   function commitPending() {
-    const n = parseInt(pending || '0', 10);
-    if (n > 0) void registerDarts(n, false);
-    else setPending('');
+    void registerDarts(parseInt(pending || '1', 10), false);
   }
 
   const recent = attempts.slice(-8).reverse();
@@ -259,82 +277,52 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         />
       </div>
 
-      <div className="chip-row scope-row">
+      <div className="pad-display" aria-live="polite">
+        +{pending || '0'} misses
+      </div>
+      <div className="num-grid dialpad">
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+          <button key={d} className="num-btn" disabled={saving} onClick={() => pressDigit(d)}>
+            {d}
+          </button>
+        ))}
         <button
-          className={`chip ${padMode ? '' : 'active'}`}
-          aria-pressed={!padMode}
-          onClick={() => selectPad(false)}
+          className="num-btn"
+          aria-label="Delete last digit"
+          disabled={saving || pending === ''}
+          onClick={() => setPending((p) => p.slice(0, -1))}
         >
-          Tap
+          ⌫
+        </button>
+        <button className="num-btn" disabled={saving} onClick={() => pressDigit('0')}>
+          0
         </button>
         <button
-          className={`chip ${padMode ? 'active' : ''}`}
-          aria-pressed={padMode}
-          onClick={() => selectPad(true)}
+          className="num-btn wide miss"
+          aria-label={pending ? 'Add misses' : undefined}
+          disabled={saving}
+          onClick={commitPending}
         >
-          Numpad
+          {pending ? '↵ Add' : 'MISS ✗'}
         </button>
       </div>
-
-      {!padMode ? (
-        <div className="live-actions">
-          <button className="btn hit-btn" disabled={saving} onClick={() => registerDarts(0, true)}>
-            HIT ✓
-          </button>
-          <button
-            className="btn miss-btn"
-            disabled={saving}
-            onClick={() => registerDarts(1, false)}
-          >
-            MISS ✗
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="pad-display" aria-live="polite">
-            +{pending || '0'} misses
-          </div>
-          <div className="num-grid dialpad">
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-              <button key={d} className="num-btn" disabled={saving} onClick={() => pressDigit(d)}>
-                {d}
-              </button>
-            ))}
-            <button
-              className="num-btn"
-              aria-label="Delete last digit"
-              disabled={saving || pending === ''}
-              onClick={() => setPending((p) => p.slice(0, -1))}
-            >
-              ⌫
-            </button>
-            <button className="num-btn" disabled={saving} onClick={() => pressDigit('0')}>
-              0
-            </button>
-            <button
-              className="num-btn wide miss"
-              aria-label="Add misses"
-              disabled={saving || !pending}
-              onClick={commitPending}
-            >
-              ↵ Add
-            </button>
-          </div>
-          <button
-            className="btn hit-btn full"
-            disabled={saving}
-            // The typed number is which dart hit: n means n-1 misses then the
-            // hit — n darts in total, unlike ↵ where n is all misses.
-            onClick={() => registerDarts(Math.max(parseInt(pending || '1', 10) - 1, 0), true)}
-          >
-            HIT ✓{pending ? ` (with dart ${pending})` : ''}
-          </button>
-        </>
-      )}
+      <button
+        className="btn hit-btn full"
+        disabled={saving}
+        // The typed number is which dart hit: n means n-1 misses then the
+        // hit — n darts in total, unlike the miss button where n is all misses.
+        onClick={() => registerDarts(Math.max(parseInt(pending || '1', 10) - 1, 0), true)}
+      >
+        HIT ✓{pending ? ` (with dart ${pending})` : ''}
+      </button>
 
       <div className="undo-turn-row">
-        <button className="btn ghost" disabled={saving} onClick={undoDart}>
-          ↶ Undo Dart
+        <button
+          className={`btn ${undoArmed ? 'danger' : 'ghost'}`}
+          disabled={saving}
+          onClick={pressUndo}
+        >
+          {undoArmed ? 'Tap again to undo dart' : '↶ Undo Dart'}
         </button>
       </div>
 
