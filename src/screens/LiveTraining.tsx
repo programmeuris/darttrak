@@ -320,9 +320,11 @@ export function LiveTraining({ matchId }: { matchId: string }) {
           <button
             className="btn hit-btn full"
             disabled={saving}
-            onClick={() => registerDarts(parseInt(pending || '0', 10), true)}
+            // The typed number is which dart hit: n means n-1 misses then the
+            // hit — n darts in total, unlike ↵ where n is all misses.
+            onClick={() => registerDarts(Math.max(parseInt(pending || '1', 10) - 1, 0), true)}
           >
-            HIT ✓{pending ? ` (after +${pending} misses)` : ''}
+            HIT ✓{pending ? ` (with dart ${pending})` : ''}
           </button>
         </>
       )}
