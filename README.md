@@ -30,8 +30,9 @@ Two reasons:
   hitting the whole board completes a round and the next bag starts on your
   next throw. Throws register on a numpad: MISS records a single miss, or type
   a count first to add that many misses at once (↵) or to record a hit with
-  that dart (HIT records the misses before it too). Stats live in their own
-  tab:
+  that dart (HIT records the misses before it too). Undo Dart takes back one
+  throw, Undo Action the whole last entry — each with a confirming second
+  tap. Stats live in their own tab:
   per-round darts-per-target and first-dart hit % with rolling averages and
   trend deltas, a dated fewest-darts-per-round personal best, and a
   Single/Double/Treble hit-% matrix for every field.

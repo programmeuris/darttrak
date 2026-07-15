@@ -666,6 +666,7 @@ body {
 .undo-turn-row {
   display: flex;
   justify-content: center;
+  gap: 8px;
 }
 
 /* ---- Turn log ---- */

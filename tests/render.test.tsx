@@ -510,6 +510,51 @@ describe('screens render without crashing', () => {
     });
   });
 
+  it('LiveTraining undo action reverts the whole last numpad entry after a confirming tap', async () => {
+    const alice = await addPlayer('Alice');
+    const m = makeMatch({
+      id: 't-act',
+      gameType: 'Training',
+      playerIds: [alice.id],
+      status: 'in_progress',
+      legs: [makeLeg('t-act', [])],
+    });
+    m.training = { target: 'D10', bag: ['S1'] };
+    await saveMatch(m);
+
+    render(<LiveTraining matchId="t-act" />);
+    await screen.findByText('D10');
+
+    // Nothing has been entered yet, so there is no action to undo.
+    const undoAction = () =>
+      screen.getByRole('button', { name: '↶ Undo Action' }) as HTMLButtonElement;
+    expect(undoAction().disabled).toBe(true);
+
+    // Two entries: 5 misses, then "hit with dart 3" (2 misses + the hit).
+    fireEvent.click(screen.getByRole('button', { name: '5' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add misses' }));
+    await waitFor(async () =>
+      expect((await getMatch('t-act'))!.legs[0].turns[0].darts).toHaveLength(5),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    fireEvent.click(screen.getByRole('button', { name: /^HIT ✓ \(with dart 3\)/ }));
+    await waitFor(async () => expect((await getMatch('t-act'))!.training!.target).toBe('S1'));
+
+    // The first tap only arms; the confirming tap removes the last entry's
+    // 3 darts in one go and makes the undone hit's target live again.
+    fireEvent.click(undoAction());
+    expect((await getMatch('t-act'))!.legs[0].turns[0].darts).toHaveLength(8);
+    fireEvent.click(screen.getByRole('button', { name: 'Tap again to undo action' }));
+    await waitFor(async () => {
+      const saved = await getMatch('t-act');
+      expect(saved!.legs[0].turns[0].darts.map((d) => d.score)).toEqual([0, 0, 0, 0, 0]);
+      expect(saved!.training!.target).toBe('D10');
+    });
+
+    // The memory is one-shot: with the entry undone there is nothing left.
+    expect(undoAction().disabled).toBe(true);
+  });
+
   it('LiveTraining completes the round on the last field and rolls into a new bag', async () => {
     const alice = await addPlayer('Alice');
     const m = makeMatch({
