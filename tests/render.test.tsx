@@ -374,7 +374,7 @@ describe('screens render without crashing', () => {
     // First press only arms the button: it turns into a red confirm and
     // nothing is undone yet.
     fireEvent.click(screen.getByRole('button', { name: '⟲ Undo Last Turn' }));
-    const armed = screen.getByRole('button', { name: 'Tap again to undo last turn' });
+    const armed = screen.getByRole('button', { name: 'Confirm' });
     expect(armed.className).toContain('danger');
     expect((await getMatch('m-undo2'))!.legs[0].turns).toHaveLength(1);
 
@@ -400,11 +400,11 @@ describe('screens render without crashing', () => {
     await screen.findAllByText('Alice');
 
     fireEvent.click(screen.getByRole('button', { name: '⟲ Undo Last Turn' }));
-    expect(screen.getByRole('button', { name: 'Tap again to undo last turn' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeTruthy();
 
     // Entering a dart signals the player is scoring, not undoing — disarm.
     fireEvent.click(screen.getByRole('button', { name: '20' }));
-    expect(screen.queryByRole('button', { name: 'Tap again to undo last turn' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull();
     expect(screen.getByRole('button', { name: '⟲ Undo Last Turn' })).toBeTruthy();
     expect((await getMatch('m-undo-disarm'))!.legs[0].turns).toHaveLength(1);
   });
@@ -425,7 +425,7 @@ describe('screens render without crashing', () => {
     await screen.findAllByText('Alice');
 
     fireEvent.click(screen.getByRole('button', { name: '⟲ Undo Last Turn' }));
-    const armed = screen.getByRole('button', { name: 'Tap again to undo last turn' });
+    const armed = screen.getByRole('button', { name: 'Confirm' });
     expect((await getMatch('atc-undo2'))!.legs[0].turns).toHaveLength(1);
 
     fireEvent.click(armed);
