@@ -35,7 +35,11 @@ Two reasons:
   taking back one throw or the whole last entry. **Group Therapy** is
   grouping practice: exactly three darts at every target, hit or miss, then
   move on — one HIT/MISS tap per dart, and each visited target wears a
-  bronze, silver, or gold outline for 1, 2, or 3 hits. In both, the target
+  bronze, silver, or gold outline for 1, 2, or 3 hits. You referee your own
+  darts, by one convention: a single target counts any bed of its number (a
+  treble 20 counts for the 20, a bull for the Outer), while double, treble,
+  and bull targets count only their band — keep to it so your hit rates stay
+  comparable between rounds. In both variants, the target
   card is a wheel: the previous and upcoming targets flank the current one,
   every advance spins the next target into focus, and the following round's
   order is dealt up front so the wheel previews straight across rounds (a
