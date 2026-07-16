@@ -22,15 +22,19 @@ import {
 } from '../atc';
 import type { AtcTargetStat } from '../atc';
 import {
+  GROUP_VISIT_DARTS,
+  TRAINING_VARIANT_LABELS,
   trainingRounds,
   trainingBestRound,
+  trainingBestHitsRound,
   trainingFieldStats,
   trainingFieldLabel,
   trainingFieldTrends,
   trainingRingAverages,
+  trainingVariantOf,
   trainingWeakFields,
 } from '../training';
-import type { TrainingFieldStat } from '../training';
+import type { TrainingFieldStat, TrainingVariant } from '../training';
 import type { Player, Match, AtcRing } from '../types';
 
 const TEXT = '#eaeaea';
@@ -1065,12 +1069,60 @@ function AtcTargets({
 }
 
 function Training({ matches, playerId }: { matches: Match[]; playerId: string }) {
+  // Each variant is its own discipline with its own numbers — Kitchen Sink
+  // scores darts-to-hit, Group Therapy hits-per-visit — so one shows at a
+  // time and records never mix. The last-viewed variant sticks per player.
+  const [variant, setVariant] = useState<TrainingVariant>(() =>
+    readPref(`trainingVariant:${playerId}`) === 'group' ? 'group' : 'sink',
+  );
+  const selectVariant = (v: TrainingVariant) => {
+    setVariant(v);
+    writePref(`trainingVariant:${playerId}`, v);
+  };
+  const scoped = matches.filter(
+    (m) => m.gameType === 'Training' && trainingVariantOf(m) === variant,
+  );
+  return (
+    <>
+      <div className="chip-row scope-row">
+        {(['sink', 'group'] as const).map((v) => (
+          <button
+            key={v}
+            className={`chip ${variant === v ? 'active' : ''}`}
+            aria-pressed={variant === v}
+            onClick={() => selectVariant(v)}
+          >
+            {TRAINING_VARIANT_LABELS[v]}
+          </button>
+        ))}
+      </div>
+      <TrainingPanel matches={scoped} playerId={playerId} variant={variant} />
+    </>
+  );
+}
+
+function TrainingPanel({
+  matches,
+  playerId,
+  variant,
+}: {
+  matches: Match[];
+  playerId: string;
+  variant: TrainingVariant;
+}) {
+  const group = variant === 'group';
   const rounds = trainingRounds(matches, playerId);
   if (rounds.length === 0) {
-    return <Empty text="No training recorded yet — start one from the Home screen." />;
+    return (
+      <Empty
+        text={`No ${TRAINING_VARIANT_LABELS[variant]} rounds yet — start one from the Home screen.`}
+      />
+    );
   }
 
-  const best = trainingBestRound(matches, playerId);
+  const best = group
+    ? trainingBestHitsRound(matches, playerId)
+    : trainingBestRound(matches, playerId);
   const totalDarts = rounds.reduce((a, r) => a + r.darts, 0);
   const totalAttempts = rounds.reduce((a, r) => a + r.attempts, 0);
   const overallFirst = totalAttempts
@@ -1093,9 +1145,12 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
     cleared: true,
   }));
   const hitValues = rounds.map((r) => r.firstDartHitRate);
-  const dartValues = rounds.map((r) => (r.resolved > 0 ? r.avgDarts : null));
+  // The second series is the variant's pace metric: darts-to-hit for Kitchen
+  // Sink, hits-per-visit for Group Therapy (where darts per target is fixed).
+  const paceLabel = group ? 'Avg hits / visit' : 'Avg darts / target';
+  const paceValues = rounds.map((r) => (r.resolved > 0 ? (group ? r.avgHits : r.avgDarts) : null));
   const hitTrend = trendDelta(hitValues);
-  const dartsTrend = trendDelta(dartValues.filter((v): v is number => v !== null));
+  const paceTrend = trendDelta(paceValues.filter((v): v is number => v !== null));
   const chartData: ChartData<'line'> = {
     labels: rounds.map((_, i) => `Round ${i + 1}`),
     datasets: [
@@ -1110,8 +1165,8 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
         order: 3,
       },
       {
-        label: 'Avg darts / target',
-        data: dartValues.map((v) => (v === null ? null : round(v))),
+        label: paceLabel,
+        data: paceValues.map((v) => (v === null ? null : round(v))),
         borderColor: AMBER,
         backgroundColor: AMBER,
         tension: 0.25,
@@ -1129,8 +1184,8 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
               'y',
             ),
             rollingLine(
-              `Darts (${ROLLING_WINDOW}-round avg)`,
-              rollingMean(dartValues, ROLLING_WINDOW, 3),
+              `${group ? 'Hits' : 'Darts'} (${ROLLING_WINDOW}-round avg)`,
+              rollingMean(paceValues, ROLLING_WINDOW, 3),
               AMBER,
               'yDarts',
             ),
@@ -1147,20 +1202,31 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
             [String(rounds.filter((r) => r.complete).length), `Rounds (${rounds.length} started)`],
             [
               best ? String(best.value) : '—',
-              best ? `Best Round (darts) · ${shortDate(best.date)}` : 'Best Round (darts)',
+              `Best Round (${group ? 'hits' : 'darts'})${best ? ` · ${shortDate(best.date)}` : ''}`,
             ],
             [String(totalDarts), 'Darts Thrown'],
             [`${overallFirst.toFixed(0)}%`, 'First-dart Hit %'],
           ]}
         />
         <p className="muted">
-          A round is one pass through the shuffle bag — every field on the board, once.
+          {group
+            ? `A round is one pass through the shuffle bag — ${GROUP_VISIT_DARTS} darts at every field on the board.`
+            : 'A round is one pass through the shuffle bag — every field on the board, once.'}
         </p>
       </section>
       <section className="card">
-        <h2 className="card-title">Darts per Target</h2>
-        <Grid cells={rings.map((r) => [r.avgDarts !== null ? r.avgDarts.toFixed(1) : '—', r.label])} />
-        <p className="muted">Average darts to hit a target, by ring — lower is better.</p>
+        <h2 className="card-title">{group ? 'Hits per Visit' : 'Darts per Target'}</h2>
+        <Grid
+          cells={rings.map((r) => {
+            const v = group ? r.avgHits : r.avgDarts;
+            return [v !== null ? v.toFixed(1) : '—', r.label];
+          })}
+        />
+        <p className="muted">
+          {group
+            ? `Average hits out of ${GROUP_VISIT_DARTS} per visit, by ring — higher is better.`
+            : 'Average darts to hit a target, by ring — lower is better.'}
+        </p>
       </section>
       {weak.length > 0 && (
         <section className="card">
@@ -1171,12 +1237,16 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
           </p>
         </section>
       )}
-      {(hitTrend || dartsTrend) && (
+      {(hitTrend || paceTrend) && (
         <section className="card">
           <h2 className="card-title">Trend</h2>
           <div className="stat-grid">
             <TrendCell label="First-dart Hit %" trend={hitTrend} goodWhen="up" unit="%" />
-            <TrendCell label="Darts / target" trend={dartsTrend} goodWhen="down" />
+            <TrendCell
+              label={group ? 'Hits / visit' : 'Darts / target'}
+              trend={paceTrend}
+              goodWhen={group ? 'up' : 'down'}
+            />
           </div>
           <p className="muted">Recent rounds vs the rounds before them — green is improving.</p>
         </section>
@@ -1184,12 +1254,12 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
       <section className="card">
         <h2 className="card-title">Progression</h2>
         <p className="muted">
-          First-dart hit % and darts per target, per round.
+          First-dart hit % and {group ? 'hits per visit' : 'darts per target'}, per round.
           {rounds.length >= ROLLING_WINDOW &&
             ` The dotted lines are ${ROLLING_WINDOW}-round rolling averages.`}
         </p>
         <ExpandableChart title="Training progression">
-          <Line data={chartData} options={atcVariantOpts(points, 'Avg darts / target')} />
+          <Line data={chartData} options={atcVariantOpts(points, paceLabel)} />
         </ExpandableChart>
       </section>
       <section className="card">

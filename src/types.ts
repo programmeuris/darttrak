@@ -51,9 +51,15 @@ export interface Match {
   doubleOut: boolean;
   atcRing?: AtcRing; // only set for Around the Clock matches
   // Training mode only: the live target, the remainder of the shuffle bag,
-  // and the next round's pre-dealt order — persisted so a reload never
-  // reshuffles mid-bag (nextBag is optional: pre-wheel records lack it).
-  training?: { target: string; bag: string[]; nextBag?: string[] };
+  // the next round's pre-dealt order, and the variant — persisted so a
+  // reload never reshuffles mid-bag. nextBag and variant are optional:
+  // older records lack them (no variant means Kitchen Sink).
+  training?: {
+    target: string;
+    bag: string[];
+    nextBag?: string[];
+    variant?: 'sink' | 'group';
+  };
   status: MatchStatus;
   legs: Leg[];
 }

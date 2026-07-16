@@ -58,10 +58,13 @@ invent storage.
 
 - `gameType`: `'501' | '301' | 'AroundTheClock' | 'Cricket' | 'Training'`
 - Training: one match record per round (a shuffle bag of all 62 fields);
-  live state on `match.training = { target, bag, nextBag }` — `nextBag` is
-  the NEXT round's pre-dealt order (its opener never equals this round's
-  last field), shown by the live screen's target wheel and consumed on
-  rollover; each target attempt is one
+  live state on `match.training = { target, bag, nextBag, variant }` —
+  `nextBag` is the NEXT round's pre-dealt order (its opener never equals
+  this round's last field), shown by the live screen's target wheel and
+  consumed on rollover. `variant` is `'sink'` (Kitchen Sink: throw until
+  the target is hit) or `'group'` (Group Therapy: exactly 3 darts per
+  target, hits scored); a MISSING variant means Kitchen Sink — always read
+  it through `trainingVariantOf`, never directly. Each target attempt is one
   Turn whose dart labels encode the field (`'✗T18'`/`'✓T18'`, `Outer`=S25,
   `Bull`=D25 — see `trainingFieldLabel`/`fieldIdFromLabel`). Unlike other
   modes, `in_progress` training rounds COUNT in stats (deliberate: the bag

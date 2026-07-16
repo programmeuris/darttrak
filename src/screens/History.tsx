@@ -5,8 +5,17 @@ import { Header } from '../components/Header';
 import { getAllMatches, getPlayers, getMatch, deleteMatch } from '../db';
 import { startingScore } from '../scoring';
 import { ATC_TARGET_COUNT, atcRingLabel } from '../atc';
-import { fieldIdFromLabel, trainingFieldLabel } from '../training';
+import {
+  TRAINING_VARIANT_LABELS,
+  fieldIdFromLabel,
+  trainingFieldLabel,
+  trainingVariantOf,
+} from '../training';
 import type { Match, Player, GameType } from '../types';
+
+// Training records show their variant's name instead of the bare game type.
+const gameLabel = (m: Match) =>
+  m.gameType === 'Training' ? TRAINING_VARIANT_LABELS[trainingVariantOf(m)] : m.gameType;
 
 // `playerId`, when set, scopes the screen to a single player's matches (reached
 // from that player's profile) and keeps navigation within the profile.
@@ -92,7 +101,7 @@ function MatchList({ lockedPlayerId, base }: { lockedPlayerId?: string; base: st
                 onClick={() => navigate(m.status === 'in_progress' ? `/live/${m.id}` : `${base}/${m.id}`)}
               >
                 <div className="match-line1">
-                  <span className="match-game">{m.gameType}</span>
+                  <span className="match-game">{gameLabel(m)}</span>
                   <span className="match-date">{new Date(m.date).toLocaleDateString()}</span>
                 </div>
                 <div className="match-players">{m.playerIds.map(nameOf).join(' vs ')}</div>
@@ -163,13 +172,15 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
 
       <section className="card">
         <div className="match-line1">
-          <span className="match-game">{match.gameType}</span>
+          <span className="match-game">{gameLabel(match)}</span>
           <span className="match-date">{new Date(match.date).toLocaleString()}</span>
         </div>
         <div className="match-players">{match.playerIds.map(nameOf).join(' vs ')}</div>
         <div className="muted">
           {isTraining
-            ? 'Training round — every field once, in shuffle-bag order'
+            ? trainingVariantOf(match) === 'group'
+              ? 'Group Therapy round — three darts at every field, in shuffle-bag order'
+              : 'Kitchen Sink round — every field once, in shuffle-bag order'
             : isAtc
               ? `Best of ${match.format.legs} · ${atcRingLabel(match.atcRing ?? 'single')}`
               : `Best of ${match.format.legs} · ${match.doubleOut ? 'Double Out' : 'Straight Out'} · Start ${start}`}

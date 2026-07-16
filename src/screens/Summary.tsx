@@ -13,7 +13,12 @@ import {
   totalDartsThrown,
 } from '../scoring';
 import { atcDartsThrown, atcHits, atcHitRate, atcFewestDartsToComplete, atcRingLabel } from '../atc';
-import { TRAINING_FIELD_COUNT, trainingRounds } from '../training';
+import {
+  TRAINING_FIELD_COUNT,
+  TRAINING_VARIANT_LABELS,
+  trainingRounds,
+  trainingVariantOf,
+} from '../training';
 import type { Match, Player } from '../types';
 
 export function Summary({ matchId }: { matchId: string }) {
@@ -51,8 +56,9 @@ export function Summary({ matchId }: { matchId: string }) {
   const nameOf = (id: string) => names.get(id) ?? 'Unknown';
   const isAtc = match.gameType === 'AroundTheClock';
   const isTraining = match.gameType === 'Training';
+  const isGroup = isTraining && trainingVariantOf(match) === 'group';
   const subtitle = isTraining
-    ? `Training round · ${new Date(match.date).toLocaleDateString()}`
+    ? `${TRAINING_VARIANT_LABELS[trainingVariantOf(match)]} round · ${new Date(match.date).toLocaleDateString()}`
     : isAtc
       ? `Around the Clock · ${atcRingLabel(match.atcRing ?? 'single')} · Best of ${match.format.legs}`
       : `${match.gameType} · Best of ${match.format.legs} · ${match.doubleOut ? 'Double Out' : 'Straight Out'}`;
@@ -61,6 +67,14 @@ export function Summary({ matchId }: { matchId: string }) {
     if (isTraining) {
       const round = trainingRounds([match!], id)[0];
       if (!round) return [];
+      if (isGroup) {
+        return [
+          ['Targets Visited', `${round.resolved}/${TRAINING_FIELD_COUNT}`],
+          ['Hits', `${round.hits}/${round.darts}`],
+          ['Avg Hits / Visit', round.resolved > 0 ? round.avgHits.toFixed(1) : '—'],
+          ['First-dart Hit %', `${round.firstDartHitRate.toFixed(0)}%`],
+        ];
+      }
       return [
         ['Fields Hit', `${round.resolved}/${TRAINING_FIELD_COUNT}`],
         ['Darts Thrown', String(round.darts)],

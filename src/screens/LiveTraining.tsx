@@ -3,7 +3,9 @@ import { navigate } from '../router';
 import { toast } from '../toast';
 import { getMatch, getPlayers, getAllMatches, saveMatch, deleteMatch } from '../db';
 import {
+  GROUP_VISIT_DARTS,
   TRAINING_FIELD_COUNT,
+  TRAINING_VARIANT_LABELS,
   advanceTraining,
   fieldIdFromLabel,
   isTrainingTurnOpen,
@@ -12,6 +14,7 @@ import {
   nextRoundBag,
   trainingAttempts,
   trainingFieldLabel,
+  trainingVariantOf,
 } from '../training';
 import { newTrainingRound } from '../trainingSession';
 import { StatCell } from '../components/Header';
@@ -30,10 +33,10 @@ const WHEEL_SPIN_MS = 450;
 export function LiveTraining({ matchId }: { matchId: string }) {
   const [match, setMatch] = useState<Match | null>(null);
   const [playerName, setPlayerName] = useState('');
-  // The previous round's last two targets: they fill the wheel's trailing
-  // slots at the start of a round, so the strip reads continuously across
-  // the seam instead of starting empty.
-  const [prevTail, setPrevTail] = useState<string[]>([]);
+  // The previous round's last two targets (with their hit counts, for the
+  // Group Therapy medals): they fill the wheel's trailing slots at the start
+  // of a round, so the strip reads continuously across the seam.
+  const [prevTail, setPrevTail] = useState<{ field: string; hits: number }[]>([]);
   // Bumped on every registered entry; the flash overlay is keyed by it so the
   // "darts landed" animation replays even when adds come in quick succession.
   const [flashKey, setFlashKey] = useState(0);
@@ -71,9 +74,14 @@ export function LiveTraining({ matchId }: { matchId: string }) {
       if (!m.training) {
         m.training = newTrainingState();
         await saveMatch(m);
-      } else if (!m.training.nextBag) {
-        // Records predating the target wheel lack the pre-dealt next round.
-        m.training = { ...m.training, nextBag: nextRoundBag(lastFieldOf(m.training)) };
+      } else if (!m.training.nextBag || !m.training.variant) {
+        // Older records predate the pre-dealt next round and the variant
+        // field — heal in place (no variant means Kitchen Sink).
+        m.training = {
+          variant: 'sink',
+          ...m.training,
+          nextBag: m.training.nextBag ?? nextRoundBag(lastFieldOf(m.training)),
+        };
         await saveMatch(m);
       }
       const players = await getPlayers();
@@ -83,6 +91,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
             x.gameType === 'Training' &&
             x.status === 'completed' &&
             x.playerIds[0] === m.playerIds[0] &&
+            trainingVariantOf(x) === trainingVariantOf(m) &&
             x.id !== m.id,
         )
         .sort((a, b) => b.date - a.date)[0];
@@ -91,7 +100,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         prev
           ? trainingAttempts(prev)
               .filter((a) => a.resolved)
-              .map((a) => a.target)
+              .map((a) => ({ field: a.target, hits: a.hits }))
               .slice(-2)
           : [],
       );
@@ -119,13 +128,22 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   if (!match) return <div className="screen" />;
 
   const training = match.training!;
+  const variant = trainingVariantOf(match);
   const leg = match.legs[match.legs.length - 1];
   const lastTurn = leg.turns[leg.turns.length - 1];
-  const openDarts = isTrainingTurnOpen(lastTurn) ? lastTurn.darts.length : 0;
+  const openDarts = isTrainingTurnOpen(lastTurn, variant) ? lastTurn.darts.length : 0;
   const attempts = trainingAttempts(match);
   const resolved = attempts.filter((a) => a.resolved);
   const dartsThisRound = attempts.reduce((acc, a) => acc + a.darts, 0);
+  const hitsThisRound = attempts.reduce((acc, a) => acc + a.hits, 0);
   const targetLabel = trainingFieldLabel(training.target);
+  // Group Therapy: the current visit's hits so far, for the live medal.
+  const liveHits =
+    variant === 'group' &&
+    openDarts > 0 &&
+    fieldIdFromLabel(lastTurn!.darts[0].label) === training.target
+      ? lastTurn!.darts.filter((d) => d.score > 0).length
+      : 0;
 
   // ---- Target wheel ----
   // One continuous strip: previous round's tail, this round's resolved
@@ -135,15 +153,20 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   // entries and exits happen out of sight. Keys carry the round so a field
   // recurring in the next round can't collide; the first target of each
   // round carries the seam marker (the visible break between rounds).
-  const resolvedTargets = resolved.map((a) => a.target);
   const nextRound = (training.nextBag ?? []).map((f, i) => ({
     field: f,
     key: `${match.id}:n:${f}`,
     seam: i === 0,
+    medal: 0,
   }));
   const past = [
-    ...prevTail.map((f) => ({ field: f, key: `p:${f}`, seam: false })),
-    ...resolvedTargets.map((f, i) => ({ field: f, key: `${match.id}:${f}`, seam: i === 0 })),
+    ...prevTail.map(({ field, hits }) => ({ field, key: `p:${field}`, seam: false, medal: hits })),
+    ...resolved.map((a, i) => ({
+      field: a.target,
+      key: `${match.id}:${a.target}`,
+      seam: i === 0,
+      medal: a.hits,
+    })),
   ];
   // While the round-boundary spin plays (the record just completed, the
   // final target is already in `past`), the next round's opener holds focus;
@@ -154,12 +177,13 @@ export function LiveTraining({ matchId }: { matchId: string }) {
     : {
         field: training.target,
         key: `${match.id}:${training.target}`,
-        seam: resolvedTargets.length === 0,
+        seam: resolved.length === 0,
+        medal: liveHits,
       };
   const ahead = rolled
     ? nextRound.slice(1)
     : [
-        ...training.bag.map((f) => ({ field: f, key: `${match.id}:${f}`, seam: false })),
+        ...training.bag.map((f) => ({ field: f, key: `${match.id}:${f}`, seam: false, medal: 0 })),
         ...nextRound,
       ];
   const wheel = [
@@ -240,19 +264,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
       setPending('');
       setFlashKey((k) => k + 1);
       if (finishedRound) {
-        const darts = trainingAttempts(next).reduce((acc, a) => acc + a.darts, 0);
-        // Deal the round from the pre-dealt order the wheel has been showing.
-        const fresh = newTrainingRound(next.playerIds[0], next.training!.nextBag);
-        await saveMatch(fresh);
-        toast(`Board complete in ${darts} darts!`);
-        // Render the completed record so the wheel spins across the seam,
-        // then navigate: the remount lands on the identical frame.
-        rolling.current = true;
-        setMatch(next);
-        rolloverTimer.current = window.setTimeout(
-          () => navigate(`/live/${fresh.id}`, { replace: true }),
-          WHEEL_SPIN_MS,
-        );
+        await rollOver(next, `Board complete in ${dartsOf(next)} darts!`);
         return;
       }
       setLastAction(misses + (hit ? 1 : 0));
@@ -264,6 +276,96 @@ export function LiveTraining({ matchId }: { matchId: string }) {
       submitting.current = false;
       setSaving(false);
     }
+  }
+
+  // Group Therapy input: one dart per tap, and the visit ends after
+  // GROUP_VISIT_DARTS darts no matter how many landed.
+  async function registerGroupDart(hit: boolean) {
+    if (!match || submitting.current || rolling.current) return;
+    disarmUndo();
+    submitting.current = true;
+    setSaving(true);
+    try {
+      const next = structuredClone(match);
+      const nextLeg = next.legs[next.legs.length - 1];
+      const state = next.training!;
+      const label = trainingFieldLabel(state.target);
+      let turn: Turn | undefined = nextLeg.turns[nextLeg.turns.length - 1];
+      // Continue the live visit only if it's still open AND still on this
+      // target (a visit can span breaks — the record keeps it live).
+      const open =
+        isTrainingTurnOpen(turn, 'group') &&
+        fieldIdFromLabel(turn!.darts[0].label) === state.target;
+      if (!open) {
+        turn = {
+          playerId: next.playerIds[0],
+          darts: [],
+          totalScore: 0,
+          remainingScore: 0,
+          isBust: false,
+          timestamp: Date.now(),
+        };
+        nextLeg.turns.push(turn);
+      }
+      turn!.darts.push(
+        hit
+          ? { score: 1, label: `✓${label}`, isDouble: false }
+          : { score: 0, label: `✗${label}`, isDouble: false },
+      );
+      let finishedRound = false;
+      if (turn!.darts.length >= GROUP_VISIT_DARTS) {
+        const advanced = advanceTraining(state);
+        if (advanced) {
+          next.training = advanced;
+        } else {
+          // Every field visited — the round is complete.
+          next.status = 'completed';
+          next.winnerId = next.playerIds[0];
+          finishedRound = true;
+        }
+      }
+      turn!.totalScore = turn!.darts.length;
+      turn!.timestamp = Date.now();
+
+      await saveMatch(next);
+      setFlashKey((k) => k + 1);
+      if (finishedRound) {
+        const hits = trainingAttempts(next).reduce((acc, a) => acc + a.hits, 0);
+        await rollOver(next, `Board complete — ${hits}/${dartsOf(next)} hits!`);
+        return;
+      }
+      setMatch(next);
+    } catch (err) {
+      console.error(err);
+      toast('Save failed — the throw was not recorded. Try again.', 'error');
+    } finally {
+      submitting.current = false;
+      setSaving(false);
+    }
+  }
+
+  function dartsOf(m: Match) {
+    return trainingAttempts(m).reduce((acc, a) => acc + a.darts, 0);
+  }
+
+  // Shared round rollover: deal the fresh round from the pre-dealt order the
+  // wheel has been showing, then render the completed record so the wheel
+  // spins across the seam before navigating — the remount lands on the
+  // identical frame.
+  async function rollOver(completed: Match, message: string) {
+    const fresh = newTrainingRound(
+      completed.playerIds[0],
+      completed.training!.nextBag,
+      trainingVariantOf(completed),
+    );
+    await saveMatch(fresh);
+    toast(message);
+    rolling.current = true;
+    setMatch(completed);
+    rolloverTimer.current = window.setTimeout(
+      () => navigate(`/live/${fresh.id}`, { replace: true }),
+      WHEEL_SPIN_MS,
+    );
   }
 
   async function undoDart() {
@@ -284,6 +386,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
               m.gameType === 'Training' &&
               m.status === 'completed' &&
               m.playerIds[0] === match.playerIds[0] &&
+              trainingVariantOf(m) === variant &&
               m.id !== match.id,
           )
           .sort((a, b) => b.date - a.date)[0];
@@ -296,7 +399,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         const reopened = structuredClone(prev);
         const rLeg = reopened.legs[reopened.legs.length - 1];
         const rTurn = rLeg.turns[rLeg.turns.length - 1];
-        rTurn.darts.pop(); // the round-final hit; training still points at its field
+        rTurn.darts.pop(); // the final attempt's last dart; training still points at its field
         if (rTurn.darts.length === 0) rLeg.turns.pop();
         else rTurn.totalScore = rTurn.darts.length;
         reopened.status = 'in_progress';
@@ -308,13 +411,18 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         return;
       }
       const popped = turn.darts.pop()!;
-      if (popped.score > 0) {
-        // Undoing a hit reopens the attempt: its target becomes live again and
-        // the freshly drawn one goes back to the front of the bag.
+      const poppedField = fieldIdFromLabel(popped.label);
+      // Whenever the pop crosses back into a previous attempt, that attempt's
+      // target is live again and the freshly drawn one returns to the front
+      // of the bag. Kitchen Sink crosses on a hit (a hit always ended the
+      // attempt); Group Therapy crosses whenever the popped dart belongs to
+      // another target (a full visit ended it, hit or not).
+      const crossed = variant === 'group' ? poppedField !== next.training!.target : popped.score > 0;
+      if (crossed) {
         next.training = {
-          target: fieldIdFromLabel(popped.label),
+          ...next.training!,
+          target: poppedField,
           bag: [next.training!.target, ...next.training!.bag],
-          nextBag: next.training!.nextBag,
         };
       }
       if (turn.darts.length === 0) nextLeg.turns.pop();
@@ -387,7 +495,9 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         <button className="icon-btn" aria-label="Back" onClick={() => navigate('/')}>
           ‹
         </button>
-        <h1 className="screen-title">Training · {playerName}</h1>
+        <h1 className="screen-title">
+          {TRAINING_VARIANT_LABELS[variant]} · {playerName}
+        </h1>
       </header>
 
       <div className="score-card active">
@@ -396,11 +506,15 @@ export function LiveTraining({ matchId }: { matchId: string }) {
           <span className="sc-name">Current target</span>
           {openDarts > 0 && <span className="sc-legs">{openDarts} thrown</span>}
         </div>
-        <div className="target-wheel">
+        <div className={`target-wheel${variant === 'group' ? ' group' : ''}`}>
           {wheel.map(({ slot, entry }) => (
             <div
               key={entry.key}
-              className={`tw-item s${slot}${entry.seam ? ' seam' : ''}`}
+              className={`tw-item s${slot}${entry.seam ? ' seam' : ''}${
+                variant === 'group' && entry.medal > 0
+                  ? ` medal-${Math.min(entry.medal, GROUP_VISIT_DARTS)}`
+                  : ''
+              }`}
             >
               {trainingFieldLabel(entry.field)}
             </div>
@@ -418,71 +532,112 @@ export function LiveTraining({ matchId }: { matchId: string }) {
       </div>
 
       <div className="stat-grid">
-        <StatCell value={String(dartsThisRound)} label="Darts This Round" />
-        <StatCell
-          value={
-            resolved.length
-              ? (resolved.reduce((a, b) => a + b.darts, 0) / resolved.length).toFixed(1)
-              : '—'
-          }
-          label="Avg Darts / Target"
-        />
+        {variant === 'group' ? (
+          <>
+            <StatCell value={String(hitsThisRound)} label="Hits This Round" />
+            <StatCell
+              value={
+                resolved.length
+                  ? (resolved.reduce((a, b) => a + b.hits, 0) / resolved.length).toFixed(1)
+                  : '—'
+              }
+              label="Avg Hits / Visit"
+            />
+          </>
+        ) : (
+          <>
+            <StatCell value={String(dartsThisRound)} label="Darts This Round" />
+            <StatCell
+              value={
+                resolved.length
+                  ? (resolved.reduce((a, b) => a + b.darts, 0) / resolved.length).toFixed(1)
+                  : '—'
+              }
+              label="Avg Darts / Target"
+            />
+          </>
+        )}
       </div>
 
-      <div className="pad-display" aria-live="polite">
-        +{pending || '0'} darts
-      </div>
-      <div className="num-grid dialpad">
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-          <button key={d} className="num-btn" disabled={saving} onClick={() => pressDigit(d)}>
-            {d}
+      {variant === 'group' ? (
+        // Every visit is exactly three darts, so entry is one tap per dart —
+        // no counts to type, no numpad.
+        <div className="live-actions">
+          <button className="btn hit-btn" disabled={saving} onClick={() => registerGroupDart(true)}>
+            HIT ✓
           </button>
-        ))}
-        <button
-          className="num-btn"
-          aria-label="Delete last digit"
-          disabled={saving || pending === ''}
-          onClick={() => setPending((p) => p.slice(0, -1))}
-        >
-          ⌫
-        </button>
-        <button className="num-btn" disabled={saving} onClick={() => pressDigit('0')}>
-          0
-        </button>
-        <button
-          className="num-btn wide miss"
-          aria-label={pending ? 'Add misses' : undefined}
-          disabled={saving}
-          onClick={commitPending}
-        >
-          {pending ? '↵ Add' : 'MISS ✗'}
-        </button>
-      </div>
-      <button
-        className="btn hit-btn full"
-        disabled={saving}
-        // The typed number is which dart hit: n means n-1 misses then the
-        // hit — n darts in total, unlike the miss button where n is all misses.
-        onClick={() => registerDarts(Math.max(parseInt(pending || '1', 10) - 1, 0), true)}
-      >
-        HIT ✓{pending ? ` (with dart ${pending})` : ''}
-      </button>
+          <button
+            className="btn miss-btn"
+            disabled={saving}
+            onClick={() => registerGroupDart(false)}
+          >
+            MISS ✗
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="pad-display" aria-live="polite">
+            +{pending || '0'} darts
+          </div>
+          <div className="num-grid dialpad">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+              <button key={d} className="num-btn" disabled={saving} onClick={() => pressDigit(d)}>
+                {d}
+              </button>
+            ))}
+            <button
+              className="num-btn"
+              aria-label="Delete last digit"
+              disabled={saving || pending === ''}
+              onClick={() => setPending((p) => p.slice(0, -1))}
+            >
+              ⌫
+            </button>
+            <button className="num-btn" disabled={saving} onClick={() => pressDigit('0')}>
+              0
+            </button>
+            <button
+              className="num-btn wide miss"
+              aria-label={pending ? 'Add misses' : undefined}
+              disabled={saving}
+              onClick={commitPending}
+            >
+              {pending ? '↵ Add' : 'MISS ✗'}
+            </button>
+          </div>
+          <button
+            className="btn hit-btn full"
+            disabled={saving}
+            // The typed number is which dart hit: n means n-1 misses then the
+            // hit — n darts in total, unlike the miss button where n is all misses.
+            onClick={() => registerDarts(Math.max(parseInt(pending || '1', 10) - 1, 0), true)}
+          >
+            HIT ✓{pending ? ` (with dart ${pending})` : ''}
+          </button>
+        </>
+      )}
 
-      <div className="undo-turn-row pair">
+      <div className={`undo-turn-row${variant === 'sink' ? ' pair' : ''}`}>
         <button
-          className={`btn ${undoArmed === 'dart' ? 'danger' : 'ghost'}`}
+          className={`btn ${variant === 'group' ? 'full ' : ''}${
+            undoArmed === 'dart' ? 'danger' : 'ghost'
+          }`}
           disabled={saving}
           onClick={() => pressUndo('dart')}
         >
           {undoArmed === 'dart' ? 'Confirm' : '↶ Undo Dart'}
         </button>
-        <button
-          className={`btn ${undoArmed === 'action' ? 'danger' : 'ghost'}`}
-          disabled={saving || lastAction === 0}
-          onClick={() => pressUndo('action')}
-        >
-          {undoArmed === 'action' ? 'Confirm' : '↶ Undo Action'}
-        </button>
+        {variant === 'sink' && (
+          // Group Therapy enters one dart at a time, so a separate whole-entry
+          // undo would be identical to Undo Dart.
+          <button
+            className={`btn ${undoArmed === 'action' ? 'danger' : 'ghost'}`}
+            disabled={saving || lastAction === 0}
+            onClick={() => pressUndo('action')}
+          >
+            {undoArmed === 'action' ? 'Confirm' : '↶ Undo Action'}
+          </button>
+        )}
       </div>
 
       <section className="card">
@@ -495,9 +650,19 @@ export function LiveTraining({ matchId }: { matchId: string }) {
               <li className="log-row" key={i}>
                 <span className="log-player">{trainingFieldLabel(a.target)}</span>
                 <span className="log-darts">
-                  {a.resolved ? `hit with dart ${a.darts}` : `${a.darts} thrown, still open`}
+                  {!a.resolved
+                    ? `${a.darts} thrown, still open`
+                    : variant === 'group'
+                      ? `${a.hits}/${GROUP_VISIT_DARTS} hits`
+                      : `hit with dart ${a.darts}`}
                 </span>
-                <span className="log-score">{a.resolved ? '✓' : '…'}</span>
+                <span className="log-score">
+                  {!a.resolved
+                    ? '…'
+                    : variant === 'group'
+                      ? ['—', '🥉', '🥈', '🥇'][Math.min(a.hits, 3)]
+                      : '✓'}
+                </span>
               </li>
             ))
           )}
