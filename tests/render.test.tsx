@@ -468,7 +468,7 @@ describe('screens render without crashing', () => {
     // Undoing a dart takes a confirming second tap, like the other live screens.
     fireEvent.click(screen.getByRole('button', { name: '↶ Undo Dart' }));
     expect((await getMatch('t-live'))!.legs[0].turns[0].darts).toHaveLength(2);
-    fireEvent.click(screen.getByRole('button', { name: 'Tap again to undo dart' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     await waitFor(async () => {
       const saved = await getMatch('t-live');
       expect(saved!.legs[0].turns[0].darts.map((d) => d.score)).toEqual([0]);
@@ -547,7 +547,7 @@ describe('screens render without crashing', () => {
     // 3 darts in one go and makes the undone hit's target live again.
     fireEvent.click(undoAction());
     expect((await getMatch('t-act'))!.legs[0].turns[0].darts).toHaveLength(8);
-    fireEvent.click(screen.getByRole('button', { name: 'Tap again to undo action' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     await waitFor(async () => {
       const saved = await getMatch('t-act');
       expect(saved!.legs[0].turns[0].darts.map((d) => d.score)).toEqual([0, 0, 0, 0, 0]);
