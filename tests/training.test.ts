@@ -5,6 +5,8 @@ import {
   trainingFieldLabel,
   fieldIdFromLabel,
   shuffledBag,
+  lastFieldOf,
+  nextRoundBag,
   newTrainingState,
   advanceTraining,
   trainingAttempts,
@@ -79,6 +81,41 @@ describe('shuffle bag', () => {
     }
     expect(seen).toHaveLength(62);
     expect(new Set(seen).size).toBe(62);
+  });
+});
+
+describe('pre-dealt next round', () => {
+  it('lastFieldOf is the end of the remaining order', () => {
+    expect(lastFieldOf({ target: 'S1', bag: ['S2', 'S3'] })).toBe('S3');
+    expect(lastFieldOf({ target: 'S1', bag: [] })).toBe('S1');
+  });
+
+  it('nextRoundBag deals every field but never opens on the current round’s last', () => {
+    for (let i = 0; i < 200; i++) {
+      const bag = nextRoundBag('T20');
+      expect(new Set(bag).size).toBe(62);
+      expect(bag[0]).not.toBe('T20');
+    }
+  });
+
+  it('newTrainingState pre-deals the next round with the seam guard applied', () => {
+    for (let i = 0; i < 50; i++) {
+      const s = newTrainingState();
+      expect(new Set(s.nextBag).size).toBe(62);
+      expect(s.nextBag![0]).not.toBe(lastFieldOf(s));
+    }
+  });
+
+  it('advanceTraining carries the pre-dealt next round along unchanged', () => {
+    let state = newTrainingState(() => 0.25);
+    const nextBag = state.nextBag;
+    for (;;) {
+      const next = advanceTraining(state);
+      if (next === null) break;
+      state = next;
+    }
+    expect(state.bag).toHaveLength(0);
+    expect(state.nextBag).toBe(nextBag);
   });
 });
 

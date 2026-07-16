@@ -470,6 +470,66 @@ body {
     opacity: 0;
   }
 }
+/* Training target wheel: previous / current / next targets on one strip; a
+   hit slides the next target into focus. Slots -2 and 2 sit outside the
+   clipped strip so items enter and leave mid-transition, never popping. */
+.target-wheel {
+  position: relative;
+  height: 3.1rem;
+  overflow: hidden;
+}
+.tw-item {
+  position: absolute;
+  top: 50%;
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -1px;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) scale(0.5);
+  opacity: 0.4;
+  transition:
+    left 0.35s ease,
+    transform 0.35s ease,
+    opacity 0.35s ease;
+}
+.tw-item.s-2 {
+  left: -20%;
+  opacity: 0;
+}
+.tw-item.s-1 {
+  left: 16%;
+}
+.tw-item.s0 {
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+.score-card.active .tw-item.s0 {
+  color: var(--accent);
+}
+.tw-item.s1 {
+  left: 84%;
+}
+.tw-item.s2 {
+  left: 120%;
+  opacity: 0;
+}
+/* The seam: each round's first target carries the break between rounds. */
+.tw-item.seam::before {
+  content: '';
+  position: absolute;
+  left: -0.55em;
+  top: 12%;
+  bottom: 12%;
+  border-left: 2px dashed var(--muted);
+  opacity: 0.7;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-item {
+    transition: none;
+  }
+}
 .atc-progress {
   height: 8px;
   background: var(--surface-2);

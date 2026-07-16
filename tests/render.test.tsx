@@ -18,6 +18,7 @@ import { LiveTraining } from '../src/screens/LiveTraining';
 import { Profile } from '../src/screens/Profile';
 import { History } from '../src/screens/History';
 import { addPlayer, saveMatch, getMatch, getAllMatches, importAllData } from '../src/db';
+import { TRAINING_FIELDS } from '../src/training';
 import { makeMatch, makeLeg, makeTurn, S, dart, atcHitDart, atcMissDart } from './helpers';
 import type { AtcRing } from '../src/types';
 
@@ -443,12 +444,20 @@ describe('screens render without crashing', () => {
       status: 'in_progress',
       legs: [makeLeg('t-live', [])],
     });
-    m.training = { target: 'T18', bag: ['S5'] };
+    m.training = { target: 'T18', bag: ['S5'], nextBag: [...TRAINING_FIELDS] };
     await saveMatch(m);
 
     const { container } = render(<LiveTraining matchId="t-live" />);
     expect(await screen.findByText('T18')).toBeTruthy();
     expect(container.querySelector('.sc-flash')).toBeNull();
+
+    // The wheel: current target in focus (carrying the round's seam), the
+    // next field to its right, nothing behind it yet.
+    const slot = (s: string) => container.querySelector(`.tw-item.${s}`);
+    expect(slot('s0')?.textContent).toBe('T18');
+    expect(slot('s0')?.className).toContain('seam');
+    expect(slot('s1')?.textContent).toBe('5');
+    expect(slot('s-1')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'MISS ✗' }));
     await waitFor(async () =>
@@ -464,6 +473,12 @@ describe('screens render without crashing', () => {
       expect(saved!.legs[0].turns[0].darts.map((d) => d.score)).toEqual([0, 1]);
       expect(saved!.training!.target).toBe('S5'); // next field dealt from the bag
     });
+    // The wheel rotated: the hit target moved behind, the bag's last field is
+    // in focus, and the pre-dealt next round's opener waits on the right.
+    await waitFor(() => expect(slot('s-1')?.textContent).toBe('T18'));
+    expect(slot('s0')?.textContent).toBe('5');
+    expect(slot('s1')?.textContent).toBe('1'); // TRAINING_FIELDS[0] = S1
+    expect(slot('s1')?.className).toContain('seam');
 
     // Undoing a dart takes a confirming second tap, like the other live screens.
     fireEvent.click(screen.getByRole('button', { name: '↶ Undo Dart' }));
@@ -490,6 +505,10 @@ describe('screens render without crashing', () => {
 
     render(<LiveTraining matchId="t-pad" />);
     await screen.findByText('D10');
+    // A record predating the wheel is healed with a pre-dealt next round.
+    await waitFor(async () =>
+      expect((await getMatch('t-pad'))!.training!.nextBag).toHaveLength(62),
+    );
 
     // Digits accumulate; ↵ commits them as misses in one save.
     fireEvent.click(screen.getByRole('button', { name: '1' }));
@@ -567,12 +586,13 @@ describe('screens render without crashing', () => {
       status: 'in_progress',
       legs: [makeLeg('t-final', [])],
     });
-    m.training = { target: 'S3', bag: [] }; // last field of the round
+    // Last field of the round, with the next round already dealt.
+    m.training = { target: 'S3', bag: [], nextBag: [...TRAINING_FIELDS] };
     await saveMatch(m);
 
-    render(<LiveTraining matchId="t-final" />);
-    // '3' matches the numpad's digit too — pin the lookup to the target card.
-    await screen.findByText('3', { selector: '.sc-target' });
+    const { container } = render(<LiveTraining matchId="t-final" />);
+    // '3' matches the numpad's digit too — pin the lookup to the wheel focus.
+    await screen.findByText('3', { selector: '.tw-item.s0' });
     fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
 
     await waitFor(async () => {
@@ -580,13 +600,57 @@ describe('screens render without crashing', () => {
       expect(finished!.status).toBe('completed');
       expect(finished!.winnerId).toBe(alice.id);
     });
-    // A fresh round record exists with a full new bag, and we navigated to it.
+    // A fresh round exists, dealt in the pre-generated order the wheel was
+    // showing. Navigation waits for the boundary spin: meanwhile the next
+    // round's opener already holds the wheel's focus, seam attached.
     const fresh = (await getAllMatches()).find(
       (x) => x.gameType === 'Training' && x.status === 'in_progress',
     );
     expect(fresh).toBeTruthy();
+    expect(fresh!.training!.target).toBe('S1'); // = nextBag[0]
     expect(1 + fresh!.training!.bag.length).toBe(62);
-    expect(location.hash).toBe(`#/live/${fresh!.id}`);
+    expect(fresh!.training!.nextBag).toHaveLength(62);
+    await waitFor(() => {
+      const focus = container.querySelector('.tw-item.s0');
+      expect(focus?.textContent).toBe('1');
+      expect(focus?.className).toContain('seam');
+    });
+    await waitFor(() => expect(location.hash).toBe(`#/live/${fresh!.id}`));
+  });
+
+  it('LiveTraining continues the wheel across rounds: the previous round trails behind', async () => {
+    const alice = await addPlayer('Alice');
+    const done = makeMatch({
+      id: 't-done',
+      date: 1000,
+      gameType: 'Training',
+      playerIds: [alice.id],
+      status: 'completed',
+      winnerId: alice.id,
+      legs: [makeLeg('t-done', [makeTurn(alice.id, [dart(1, '✓T20')], 0)])],
+    });
+    done.training = { target: 'T20', bag: [], nextBag: [...TRAINING_FIELDS] };
+    await saveMatch(done);
+    const live = makeMatch({
+      id: 't-cont',
+      date: 2000,
+      gameType: 'Training',
+      playerIds: [alice.id],
+      status: 'in_progress',
+      legs: [makeLeg('t-cont', [])],
+    });
+    live.training = { target: 'D10', bag: ['S1'], nextBag: [...TRAINING_FIELDS] };
+    await saveMatch(live);
+
+    const { container } = render(<LiveTraining matchId="t-cont" />);
+    await screen.findByText('D10');
+    // The previous round's final target sits behind the fresh opener, which
+    // carries the seam — the wheel reads as one line across rounds.
+    await waitFor(() =>
+      expect(container.querySelector('.tw-item.s-1')?.textContent).toBe('T20'),
+    );
+    expect(container.querySelector('.tw-item.s0')?.textContent).toBe('D10');
+    expect(container.querySelector('.tw-item.s0')?.className).toContain('seam');
   });
 
   it('Home starts (and later continues) the main player’s training', async () => {

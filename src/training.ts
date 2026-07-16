@@ -54,11 +54,38 @@ export function shuffledBag(random: () => number = Math.random): string[] {
 export interface TrainingState {
   target: string;
   bag: string[]; // fields still to come this round
+  // The NEXT round's full order, dealt when this one completes. Generated up
+  // front so the live screen can preview targets across the round boundary;
+  // optional because records predating the target wheel lack it (healed on
+  // load). Its first field never equals this round's last (see nextRoundBag).
+  nextBag?: string[];
+}
+
+/** The final field of the round in its current order (the seam's left side). */
+export function lastFieldOf(state: Pick<TrainingState, 'target' | 'bag'>): string {
+  return state.bag.length ? state.bag[state.bag.length - 1] : state.target;
+}
+
+/**
+ * The order the round AFTER this one will be dealt in. A plain reshuffle,
+ * except it may not open with `lastOfCurrent`: back-to-back rounds would
+ * otherwise repeat a target across the seam and the wheel couldn't show a
+ * break. Rejection keeps the draw uniform over the allowed orderings (and
+ * rejects only 1-in-62 shuffles).
+ */
+export function nextRoundBag(
+  lastOfCurrent: string,
+  random: () => number = Math.random,
+): string[] {
+  let bag = shuffledBag(random);
+  while (bag[0] === lastOfCurrent) bag = shuffledBag(random);
+  return bag;
 }
 
 export function newTrainingState(random?: () => number): TrainingState {
   const bag = shuffledBag(random);
-  return { target: bag.shift()!, bag };
+  const target = bag.shift()!;
+  return { target, bag, nextBag: nextRoundBag(lastFieldOf({ target, bag }), random) };
 }
 
 /**
@@ -68,7 +95,7 @@ export function newTrainingState(random?: () => number): TrainingState {
 export function advanceTraining(state: TrainingState): TrainingState | null {
   if (state.bag.length === 0) return null;
   const bag = [...state.bag];
-  return { target: bag.shift()!, bag };
+  return { target: bag.shift()!, bag, nextBag: state.nextBag };
 }
 
 // ---- Stats ----
