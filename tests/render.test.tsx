@@ -120,6 +120,23 @@ describe('screens render without crashing', () => {
     expect(localStorage.getItem('darttrak:mainPlayer')).toBeNull();
   });
 
+  it('Profile stores the training trend window per player', async () => {
+    const alice = await addPlayer('Alice');
+    render(<Profile playerId={alice.id} />);
+    const input = (await screen.findByLabelText(
+      'Training improvement window (rounds)',
+    )) as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: '5' } });
+    expect(localStorage.getItem(`darttrak:trainingTrendWindow:${alice.id}`)).toBe('5');
+
+    // Non-digits and leading zeros are stripped; clearing removes the pref.
+    fireEvent.change(input, { target: { value: '0x7' } });
+    expect(input.value).toBe('7');
+    fireEvent.change(input, { target: { value: '' } });
+    expect(localStorage.getItem(`darttrak:trainingTrendWindow:${alice.id}`)).toBeNull();
+  });
+
   it('Home clears the main player when they are deleted', async () => {
     const alice = await addPlayer('Alice');
     localStorage.setItem('darttrak:mainPlayer', alice.id);
@@ -1228,10 +1245,14 @@ describe('player profiles', () => {
         ],
       }),
     );
+    // A trend window is set, but one round can't fill both sides yet.
+    localStorage.setItem(`darttrak:trainingTrendWindow:${alice.id}`, '5');
     render(<PlayerStats playerId={alice.id} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Training' }));
 
     expect(await screen.findByText('Hit % Per Field')).toBeTruthy();
+    // The footnote explains the halves fallback until the window can apply.
+    expect(screen.getByText(/your window of 5 takes over at 10 rounds/)).toBeTruthy();
     // Matrix: T20 hit 1/5 → 20%; the bull row's single column is the outer.
     expect(screen.getByTitle('1/5').textContent).toBe('20%');
     expect(screen.getByTitle('1/1').textContent).toBe('100%');

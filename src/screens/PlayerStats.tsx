@@ -1079,6 +1079,11 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
     : 0;
   const rings = trainingRingAverages(matches, playerId);
   const weak = trainingWeakFields(matches, playerId);
+  // The ▲▼ markers compare round halves unless the player set a trend window
+  // on their profile; a window only takes effect once it can fill both sides.
+  const parsedWindow = parseInt(readPref(`trainingTrendWindow:${playerId}`) ?? '', 10);
+  const trendWindow = Number.isFinite(parsedWindow) && parsedWindow >= 1 ? parsedWindow : null;
+  const effectiveWindow = trendWindow && rounds.length >= trendWindow * 2 ? trendWindow : null;
 
   // Per-round series: both metrics are per-target figures, so the live round
   // (a uniformly random subset of the bag) plots unbiased alongside complete
@@ -1192,10 +1197,16 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
         <p className="muted">
           Across all training. Tap a column to sort; tap and hold a cell for its hits/darts.
         </p>
-        <TrainingMatrix matches={matches} playerId={playerId} />
+        <TrainingMatrix matches={matches} playerId={playerId} window={effectiveWindow} />
         <p className="muted">
-          ▲▼ compare each field's hit % in the recent half of your rounds with the earlier half
-          (shown once both halves have enough darts).
+          {effectiveWindow
+            ? `▲▼ compare each field's hit % across your last ${effectiveWindow} round${
+                effectiveWindow === 1 ? '' : 's'
+              } with the ${effectiveWindow} before them (shown once both sides have enough darts).`
+            : `▲▼ compare each field's hit % in the recent half of your rounds with the earlier ` +
+              `half${
+                trendWindow ? ` — your window of ${trendWindow} takes over at ${trendWindow * 2} rounds` : ''
+              } (shown once both halves have enough darts).`}
         </p>
       </section>
     </>
@@ -1209,12 +1220,20 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
 // the ATC area table's ± column.
 type FieldSortKey = 'field' | 'S' | 'D' | 'T';
 
-function TrainingMatrix({ matches, playerId }: { matches: Match[]; playerId: string }) {
+function TrainingMatrix({
+  matches,
+  playerId,
+  window,
+}: {
+  matches: Match[];
+  playerId: string;
+  window: number | null;
+}) {
   const [sortKey, setSortKey] = useState<FieldSortKey>('field');
   const [sortDir, setSortDir] = useState<AreaSortDir>('asc');
 
   const fields = new Map(trainingFieldStats(matches, playerId).map((f) => [f.id, f]));
-  const trends = trainingFieldTrends(matches, playerId);
+  const trends = trainingFieldTrends(matches, playerId, 5, window);
 
   function toggleSort(key: FieldSortKey) {
     if (key === sortKey) {
