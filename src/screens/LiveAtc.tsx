@@ -385,11 +385,11 @@ export function LiveAtc({ matchId }: { matchId: string }) {
 
       <div className="undo-turn-row">
         <button
-          className={`btn ${undoArmed ? 'danger' : 'ghost'}`}
+          className={`btn full ${undoArmed ? 'danger' : 'ghost'}`}
           disabled={saving}
           onClick={pressUndoTurn}
         >
-          {undoArmed ? 'Tap again to undo last turn' : '⟲ Undo Last Turn'}
+          {undoArmed ? 'Confirm' : '⟲ Undo Last Turn'}
         </button>
       </div>
 
