@@ -1199,9 +1199,9 @@ describe('player profiles', () => {
     );
   });
 
-  it('PlayerStats Training tab shows round stats and the per-field matrix', async () => {
+  it('PlayerStats Training tab shows round stats, ring averages, and the field matrix', async () => {
     const alice = await addPlayer('Alice');
-    // One completed round's worth of data: T20 in two darts, Outer first dart.
+    // One completed round's worth of data: T20 in five darts, Outer first dart.
     await saveMatch(
       makeMatch({
         id: 't-stats',
@@ -1212,7 +1212,17 @@ describe('player profiles', () => {
         status: 'completed',
         legs: [
           makeLeg('t-stats', [
-            makeTurn(alice.id, [dart(0, '✗T20'), dart(1, '✓T20')], 0),
+            makeTurn(
+              alice.id,
+              [
+                dart(0, '✗T20'),
+                dart(0, '✗T20'),
+                dart(0, '✗T20'),
+                dart(0, '✗T20'),
+                dart(1, '✓T20'),
+              ],
+              0,
+            ),
             makeTurn(alice.id, [dart(1, '✓Outer')], 0),
           ]),
         ],
@@ -1222,11 +1232,30 @@ describe('player profiles', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Training' }));
 
     expect(await screen.findByText('Hit % Per Field')).toBeTruthy();
-    // Matrix: T20 hit 1/2 → 50%; the bull row's single column is the outer.
-    expect(screen.getByTitle('1/2').textContent).toBe('50%');
+    // Matrix: T20 hit 1/5 → 20%; the bull row's single column is the outer.
+    expect(screen.getByTitle('1/5').textContent).toBe('20%');
     expect(screen.getByTitle('1/1').textContent).toBe('100%');
-    // The 3-dart round is the dated best round.
-    expect(screen.getByText(/Best Round \(darts\)/).previousElementSibling!.textContent).toBe('3');
+    // The 6-dart round is the dated best round; the volume tile is gone.
+    expect(screen.getByText(/Best Round \(darts\)/).previousElementSibling!.textContent).toBe('6');
+    expect(screen.queryByText('Targets Hit')).toBeNull();
+
+    // Darts per Target splits by ring: 5 for the treble, 1 for the outer,
+    // 3.0 overall, and untouched rings stay dashes.
+    const ringValue = (label: string) =>
+      screen.getByText(label).previousElementSibling!.textContent;
+    expect(ringValue('All Targets')).toBe('3.0');
+    expect(ringValue('Trebles')).toBe('5.0');
+    expect(ringValue('Outer')).toBe('1.0');
+    expect(ringValue('Doubles')).toBe('—');
+
+    // Focus Fields calls out the weakest adequately-sampled field.
+    expect(screen.getByText('Focus Fields')).toBeTruthy();
+    expect(screen.getByText('20% · 1/5')).toBeTruthy();
+
+    // Sorting by the Treble column floats the only row with treble data.
+    fireEvent.click(screen.getByRole('button', { name: 'Treble' }));
+    const firstField = document.querySelector('.area-table tbody .area-name');
+    expect(firstField!.textContent).toBe('20');
   });
 
   it('PlayerStats charts expand into a fullscreen viewer and close on Escape', async () => {

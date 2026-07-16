@@ -1137,6 +1137,19 @@ body {
 .area-table .area-name {
   font-weight: 600;
 }
+/* Tiny per-cell improvement marker in the training field matrix. */
+.area-table .cell-trend {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.area-table .cell-trend.good {
+  color: var(--success-text);
+}
+.area-table .cell-trend.bad {
+  color: var(--danger-text);
+}
 .area-table .no-data {
   color: var(--muted);
 }
