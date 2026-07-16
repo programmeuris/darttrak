@@ -1256,6 +1256,11 @@ describe('player profiles', () => {
     // Matrix: T20 hit 1/5 → 20%; the bull row's single column is the outer.
     expect(screen.getByTitle('1/5').textContent).toBe('20%');
     expect(screen.getByTitle('1/1').textContent).toBe('100%');
+    // Tapping a cell swaps the % for its hits/darts; tapping again swaps back.
+    fireEvent.click(screen.getByTitle('1/5'));
+    expect(screen.getByTitle('1/5').textContent).toBe('1/5');
+    fireEvent.click(screen.getByTitle('1/5'));
+    expect(screen.getByTitle('1/5').textContent).toBe('20%');
     // The 6-dart round is the dated best round; the volume tile is gone.
     expect(screen.getByText(/Best Round \(darts\)/).previousElementSibling!.textContent).toBe('6');
     expect(screen.queryByText('Targets Hit')).toBeNull();
