@@ -688,6 +688,13 @@ body {
   justify-content: center;
   gap: 8px;
 }
+/* Training's Undo Dart / Undo Action pair: fixed half-width columns spanning
+   the content width, so arming (the label flips to "Confirm") can never
+   change a button's size or shift its neighbour. */
+.undo-turn-row.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
 
 /* ---- Turn log ---- */
 .turn-log {

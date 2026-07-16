@@ -363,20 +363,20 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         HIT ✓{pending ? ` (with dart ${pending})` : ''}
       </button>
 
-      <div className="undo-turn-row">
+      <div className="undo-turn-row pair">
         <button
           className={`btn ${undoArmed === 'dart' ? 'danger' : 'ghost'}`}
           disabled={saving}
           onClick={() => pressUndo('dart')}
         >
-          {undoArmed === 'dart' ? 'Tap again to undo dart' : '↶ Undo Dart'}
+          {undoArmed === 'dart' ? 'Confirm' : '↶ Undo Dart'}
         </button>
         <button
           className={`btn ${undoArmed === 'action' ? 'danger' : 'ghost'}`}
           disabled={saving || lastAction === 0}
           onClick={() => pressUndo('action')}
         >
-          {undoArmed === 'action' ? 'Tap again to undo action' : '↶ Undo Action'}
+          {undoArmed === 'action' ? 'Confirm' : '↶ Undo Action'}
         </button>
       </div>
 
