@@ -64,7 +64,10 @@ invent storage.
   consumed on rollover. `variant` is `'sink'` (Kitchen Sink: throw until
   the target is hit) or `'group'` (Group Therapy: exactly 3 darts per
   target, hits scored); a MISSING variant means Kitchen Sink — always read
-  it through `trainingVariantOf`, never directly. Each target attempt is one
+  it through `trainingVariantOf`, never directly. Hits are self-refereed
+  (the app never sees where a dart lands) under a documented convention:
+  a single target counts any bed of its number; double, treble, and bull
+  targets count only their band. Each target attempt is one
   Turn whose dart labels encode the field (`'✗T18'`/`'✓T18'`, `Outer`=S25,
   `Bull`=D25 — see `trainingFieldLabel`/`fieldIdFromLabel`). Unlike other
   modes, `in_progress` training rounds COUNT in stats (deliberate: the bag

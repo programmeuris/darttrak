@@ -735,7 +735,7 @@ describe('screens render without crashing', () => {
 
     render(<Home />);
     await screen.findByText('Alice');
-    fireEvent.click(screen.getByRole('button', { name: '🚰 Kitchen Sink' }));
+    fireEvent.click(screen.getByRole('button', { name: /🚰 Kitchen Sink/ }));
 
     let roundId = '';
     await waitFor(async () => {
@@ -753,7 +753,7 @@ describe('screens render without crashing', () => {
     location.hash = '';
     render(<Home />);
     await screen.findByText('Alice');
-    fireEvent.click(screen.getByRole('button', { name: '🚰 Kitchen Sink' }));
+    fireEvent.click(screen.getByRole('button', { name: /🚰 Kitchen Sink/ }));
     await waitFor(() => expect(location.hash).toBe(`#/live/${roundId}`));
     expect((await getAllMatches()).filter((m) => m.gameType === 'Training')).toHaveLength(1);
 
@@ -763,7 +763,7 @@ describe('screens render without crashing', () => {
     location.hash = '';
     render(<Home />);
     await screen.findByText('Alice');
-    fireEvent.click(screen.getByRole('button', { name: '🛋️ Group Therapy' }));
+    fireEvent.click(screen.getByRole('button', { name: /🛋️ Group Therapy/ }));
     await waitFor(async () => {
       const rounds = (await getAllMatches()).filter((m) => m.gameType === 'Training');
       expect(rounds).toHaveLength(2);
@@ -776,7 +776,7 @@ describe('screens render without crashing', () => {
     await addPlayer('Bob');
     render(<Home />);
     await screen.findByText('Alice');
-    fireEvent.click(screen.getByRole('button', { name: '🚰 Kitchen Sink' }));
+    fireEvent.click(screen.getByRole('button', { name: /🚰 Kitchen Sink/ }));
 
     await waitFor(() =>
       expect(document.getElementById('toast')!.textContent).toContain('Star a main player'),
@@ -794,7 +794,7 @@ describe('screens render without crashing', () => {
     await addPlayer('Alice');
     const bob = await addPlayer('Bob');
     render(<Profile playerId={bob.id} />);
-    fireEvent.click(await screen.findByRole('button', { name: '🛋️ Group Therapy' }));
+    fireEvent.click(await screen.findByRole('button', { name: /🛋️ Group Therapy/ }));
 
     await waitFor(async () => {
       const rounds = (await getAllMatches()).filter((m) => m.gameType === 'Training');

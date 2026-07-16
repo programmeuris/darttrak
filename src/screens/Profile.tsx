@@ -5,6 +5,7 @@ import { Header } from '../components/Header';
 import { getPlayer, getMatchesByPlayer } from '../db';
 import { clearPref, readMainPlayer, readPref, writeMainPlayer, writePref } from '../prefs';
 import { startOrContinueTraining } from '../trainingSession';
+import { TrainingButtons } from '../components/TrainingButtons';
 import type { TrainingVariant } from '../training';
 import type { Player } from '../types';
 
@@ -92,12 +93,7 @@ export function Profile({ playerId }: { playerId: string }) {
         <button className="btn primary big" onClick={() => navigate(`/player/${playerId}/stats`)}>
           📊 Analytics
         </button>
-        <button className="btn" onClick={() => startTraining('sink')}>
-          🚰 Kitchen Sink
-        </button>
-        <button className="btn" onClick={() => startTraining('group')}>
-          🛋️ Group Therapy
-        </button>
+        <TrainingButtons onStart={startTraining} />
         <button className="btn" onClick={() => navigate(`/player/${playerId}/history`)}>
           History
         </button>

@@ -195,6 +195,20 @@ body {
 .home-actions .full-row {
   grid-column: 1 / -1;
 }
+/* Training start buttons: the mode's name with what it trains underneath. */
+.btn.training-btn {
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 6px;
+}
+.training-btn > span {
+  white-space: nowrap;
+}
+.training-btn .training-sub {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+}
 
 /* ---- Cards ---- */
 .card {

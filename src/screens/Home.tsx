@@ -10,6 +10,7 @@ import {
 } from '../db';
 import { readMainPlayer, writeMainPlayer } from '../prefs';
 import { startOrContinueTraining } from '../trainingSession';
+import { TrainingButtons } from '../components/TrainingButtons';
 import type { TrainingVariant } from '../training';
 import type { Player, ExportBundle } from '../types';
 
@@ -192,12 +193,7 @@ export function Home() {
         <button className="btn primary big" onClick={() => navigate('/setup')}>
           🎯 New Match
         </button>
-        <button className="btn big" onClick={() => startTraining('sink')}>
-          🚰 Kitchen Sink
-        </button>
-        <button className="btn big" onClick={() => startTraining('group')}>
-          🛋️ Group Therapy
-        </button>
+        <TrainingButtons onStart={startTraining} />
       </div>
 
       <section className="card">
