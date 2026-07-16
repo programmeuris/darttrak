@@ -13,6 +13,10 @@ import {
   trainingRounds,
   trainingBestRound,
   trainingFieldStats,
+  trainingFieldTrends,
+  trainingRingOf,
+  trainingRingAverages,
+  trainingWeakFields,
 } from '../src/training';
 import { makeMatch, makeLeg, makeTurn, dart } from './helpers';
 import type { Match } from '../src/types';
@@ -156,6 +160,72 @@ describe('round stats', () => {
     // In-progress rounds never hold the record.
     const live = trainingMatch('r3', 3000, [makeTurn(A, attempt('S2', 0), 0)]);
     expect(trainingBestRound([live], A)).toBeNull();
+  });
+
+  it('splits darts-per-target by ring, resolved attempts only', () => {
+    // T20 in 3, D16 in 1, S10 in 2, Outer in 2, Bull in 4 — S5 stays open.
+    const m = trainingMatch('rings', 1000, [
+      makeTurn(A, attempt('T20', 2), 0),
+      makeTurn(A, attempt('D16', 0), 0),
+      makeTurn(A, attempt('S10', 1), 0),
+      makeTurn(A, attempt('S25', 1), 0),
+      makeTurn(A, attempt('D25', 3), 0),
+      makeTurn(A, [dart(0, '✗5'), dart(0, '✗5')], 0),
+    ]);
+    const rings = new Map(trainingRingAverages([m], A).map((r) => [r.ring, r]));
+    expect(rings.get('all')).toMatchObject({ darts: 12, resolved: 5, avgDarts: 2.4 });
+    expect(rings.get('single')).toMatchObject({ darts: 2, resolved: 1, avgDarts: 2 });
+    expect(rings.get('double')!.avgDarts).toBe(1);
+    expect(rings.get('treble')!.avgDarts).toBe(3);
+    expect(rings.get('outer')!.avgDarts).toBe(2);
+    expect(rings.get('bull')!.avgDarts).toBe(4);
+    // The outer and bull are their own rings, never singles/doubles.
+    expect(trainingRingOf('S25')).toBe('outer');
+    expect(trainingRingOf('D25')).toBe('bull');
+    expect(trainingRingOf('S7')).toBe('single');
+  });
+
+  it('surfaces the weakest fields, requiring a minimum sample', () => {
+    // T3: 1/10 (10%), D16: 1/4 (25% but only 4 darts — below the sample bar),
+    // S10: 5 attempts first-dart (5/5, 100%), T20: 2/9 (22%).
+    const m = trainingMatch('weak', 1000, [
+      makeTurn(A, attempt('T3', 9), 0),
+      makeTurn(A, attempt('D16', 3), 0),
+      makeTurn(A, attempt('T20', 4), 0),
+      makeTurn(A, attempt('T20', 3), 0),
+      ...Array.from({ length: 5 }, () => makeTurn(A, attempt('S10', 0), 0)),
+    ]);
+    const weak = trainingWeakFields([m], A, 3, 5);
+    expect(weak.map((f) => f.id)).toEqual(['T3', 'T20', 'S10']);
+    expect(weak[0].hitRate).toBe(10);
+    // D16 is excluded: 4 darts is noise, not a weak field.
+    expect(weak.find((f) => f.id === 'D16')).toBeUndefined();
+  });
+
+  it('measures per-field improvement between the earlier and recent halves of rounds', () => {
+    // Earlier round: T20 at 1/10. Recent round: T20 at 5/10 → +40 points.
+    // S10 has plenty of darts early but too few recently → null.
+    const early = trainingMatch(
+      'half1',
+      1000,
+      [makeTurn(A, attempt('T20', 9), 0), makeTurn(A, attempt('S10', 7), 0)],
+      true,
+    );
+    const recent = trainingMatch(
+      'half2',
+      2000,
+      [
+        ...Array.from({ length: 5 }, () => makeTurn(A, attempt('T20', 1), 0)),
+        makeTurn(A, attempt('S10', 0), 0),
+      ],
+      true,
+    );
+    const trends = trainingFieldTrends([early, recent], A);
+    expect(trends.get('T20')).toBe(40);
+    expect(trends.get('S10')).toBeNull();
+    expect(trends.get('D5')).toBeNull(); // never thrown at
+    // A single round has no halves to compare.
+    expect(trainingFieldTrends([early], A).get('T20')).toBeNull();
   });
 
   it('counts every dart toward per-field stats, misses on open attempts included', () => {

@@ -39,8 +39,11 @@ Two reasons:
   throw, Undo Action the whole last entry — each with a confirming second
   tap. Stats live in their own tab:
   per-round darts-per-target and first-dart hit % with rolling averages and
-  trend deltas, a dated fewest-darts-per-round personal best, and a
-  Single/Double/Treble hit-% matrix for every field.
+  trend deltas, a dated fewest-darts-per-round personal best, darts-per-target
+  split by ring (singles / doubles / trebles / outer / bull), a Focus Fields
+  callout naming your weakest fields, and a sortable Single/Double/Treble
+  hit-% matrix for every field where each cell carries a ▲▼ marker comparing
+  your recent rounds with the earlier ones.
 - **1–4 players** per match, drawn from a saved roster; mark one as the
   device's **main player** from their profile page and they lead the roster
   with a star, are preselected for every new game, and are the default on the

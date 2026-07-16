@@ -26,7 +26,11 @@ import {
   trainingBestRound,
   trainingFieldStats,
   trainingFieldLabel,
+  trainingFieldTrends,
+  trainingRingAverages,
+  trainingWeakFields,
 } from '../training';
+import type { TrainingFieldStat } from '../training';
 import type { Player, Match, AtcRing } from '../types';
 
 const TEXT = '#eaeaea';
@@ -1068,15 +1072,13 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
 
   const best = trainingBestRound(matches, playerId);
   const totalDarts = rounds.reduce((a, r) => a + r.darts, 0);
-  const totalResolved = rounds.reduce((a, r) => a + r.resolved, 0);
   const totalAttempts = rounds.reduce((a, r) => a + r.attempts, 0);
-  const overallAvg = totalResolved
-    ? rounds.reduce((a, r) => a + r.avgDarts * r.resolved, 0) / totalResolved
-    : 0;
   const overallFirst = totalAttempts
     ? (rounds.reduce((a, r) => a + (r.firstDartHitRate * r.attempts) / 100, 0) / totalAttempts) *
       100
     : 0;
+  const rings = trainingRingAverages(matches, playerId);
+  const weak = trainingWeakFields(matches, playerId);
 
   // Per-round series: both metrics are per-target figures, so the live round
   // (a uniformly random subset of the bag) plots unbiased alongside complete
@@ -1132,17 +1134,6 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
     ],
   };
 
-  const fields = new Map(trainingFieldStats(matches, playerId).map((f) => [f.id, f]));
-  const cell = (id: string) => {
-    const f = fields.get(id);
-    if (!f || f.darts === 0) return <td className="num">—</td>;
-    return (
-      <td className="num" title={`${f.hits}/${f.darts}`}>
-        {f.hitRate.toFixed(0)}%
-      </td>
-    );
-  };
-
   return (
     <>
       <section className="card">
@@ -1153,9 +1144,7 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
               best ? String(best.value) : '—',
               best ? `Best Round (darts) · ${shortDate(best.date)}` : 'Best Round (darts)',
             ],
-            [String(totalResolved), 'Targets Hit'],
             [String(totalDarts), 'Darts Thrown'],
-            [overallAvg > 0 ? overallAvg.toFixed(1) : '—', 'Avg Darts / Target'],
             [`${overallFirst.toFixed(0)}%`, 'First-dart Hit %'],
           ]}
         />
@@ -1163,6 +1152,20 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
           A round is one pass through the shuffle bag — every field on the board, once.
         </p>
       </section>
+      <section className="card">
+        <h2 className="card-title">Darts per Target</h2>
+        <Grid cells={rings.map((r) => [r.avgDarts !== null ? r.avgDarts.toFixed(1) : '—', r.label])} />
+        <p className="muted">Average darts to hit a target, by ring — lower is better.</p>
+      </section>
+      {weak.length > 0 && (
+        <section className="card">
+          <h2 className="card-title">Focus Fields</h2>
+          <Grid cells={weak.map((f) => [f.label, `${f.hitRate.toFixed(0)}% · ${f.hits}/${f.darts}`])} />
+          <p className="muted">
+            Your lowest hit rates (at least 5 darts thrown), weakest first — aim here.
+          </p>
+        </section>
+      )}
       {(hitTrend || dartsTrend) && (
         <section className="card">
           <h2 className="card-title">Trend</h2>
@@ -1187,37 +1190,124 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
       <section className="card">
         <h2 className="card-title">Hit % Per Field</h2>
         <p className="muted">
-          Across all training. Tap and hold a cell for its hits/darts.
+          Across all training. Tap a column to sort; tap and hold a cell for its hits/darts.
         </p>
-        <table className="area-table">
-          <thead>
-            <tr>
-              <th>Field</th>
-              <th className="num">Single</th>
-              <th className="num">Double</th>
-              <th className="num">Treble</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
-              <tr key={n}>
-                <td className="area-name">{n}</td>
-                {cell(`S${n}`)}
-                {cell(`D${n}`)}
-                {cell(`T${n}`)}
-              </tr>
-            ))}
-            <tr>
-              {/* The bull row: its "single" is the outer (25), its "double" the
-                  bull (50); a treble bull doesn't exist. */}
-              <td className="area-name">{trainingFieldLabel('D25')}</td>
-              {cell('S25')}
-              {cell('D25')}
-              <td className="num">—</td>
-            </tr>
-          </tbody>
-        </table>
+        <TrainingMatrix matches={matches} playerId={playerId} />
+        <p className="muted">
+          ▲▼ compare each field's hit % in the recent half of your rounds with the earlier half
+          (shown once both halves have enough darts).
+        </p>
       </section>
     </>
+  );
+}
+
+// The 21×3 field matrix: one row per number (plus the bull row, whose
+// "single" is the outer and whose treble doesn't exist), sortable by field
+// order or by any ring column's hit %. Each cell carries a small ▲▼ delta —
+// the field's recent-half vs earlier-half improvement, the training twin of
+// the ATC area table's ± column.
+type FieldSortKey = 'field' | 'S' | 'D' | 'T';
+
+function TrainingMatrix({ matches, playerId }: { matches: Match[]; playerId: string }) {
+  const [sortKey, setSortKey] = useState<FieldSortKey>('field');
+  const [sortDir, setSortDir] = useState<AreaSortDir>('asc');
+
+  const fields = new Map(trainingFieldStats(matches, playerId).map((f) => [f.id, f]));
+  const trends = trainingFieldTrends(matches, playerId);
+
+  function toggleSort(key: FieldSortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'field' ? 'asc' : 'desc'); // hit % reads best highest-first
+    }
+  }
+  const ariaSort = (key: FieldSortKey): 'ascending' | 'descending' | 'none' =>
+    sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+  const caret = (key: FieldSortKey) => (sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+
+  const rows = [
+    ...Array.from({ length: 20 }, (_, i) => {
+      const n = i + 1;
+      return {
+        label: String(n),
+        order: n,
+        S: { id: `S${n}`, stat: fields.get(`S${n}`) },
+        D: { id: `D${n}`, stat: fields.get(`D${n}`) },
+        T: { id: `T${n}`, stat: fields.get(`T${n}`) } as { id: string; stat?: TrainingFieldStat },
+      };
+    }),
+    {
+      label: trainingFieldLabel('D25'),
+      order: 21,
+      S: { id: 'S25', stat: fields.get('S25') },
+      D: { id: 'D25', stat: fields.get('D25') },
+      T: { id: '', stat: undefined },
+    },
+  ];
+  // Rows without data in the chosen ring sink to the bottom in field order;
+  // the rest sort by that ring's hit %, tie-broken by field for stability.
+  const sorted = [...rows].sort((a, b) => {
+    if (sortKey === 'field') return sortDir === 'asc' ? a.order - b.order : b.order - a.order;
+    const av = a[sortKey].stat;
+    const bv = b[sortKey].stat;
+    const aEmpty = !av || av.darts === 0;
+    const bEmpty = !bv || bv.darts === 0;
+    if (aEmpty || bEmpty) {
+      if (aEmpty && bEmpty) return a.order - b.order;
+      return aEmpty ? 1 : -1;
+    }
+    let cmp = av!.hitRate - bv!.hitRate;
+    if (cmp === 0) cmp = a.order - b.order;
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const cell = ({ id, stat }: { id: string; stat?: TrainingFieldStat }) => {
+    if (!stat || stat.darts === 0) return <td className="num">—</td>;
+    const delta = trends.get(id) ?? null;
+    return (
+      <td className="num" title={`${stat.hits}/${stat.darts}`}>
+        {stat.hitRate.toFixed(0)}%
+        {delta !== null && Math.round(delta) !== 0 && (
+          <span className={`cell-trend ${delta > 0 ? 'good' : 'bad'}`}>
+            {delta > 0 ? '▲' : '▼'}
+            {Math.abs(delta).toFixed(0)}
+          </span>
+        )}
+      </td>
+    );
+  };
+  const header = (key: FieldSortKey, label: string) => (
+    <th className={key === 'field' ? '' : 'num'} aria-sort={ariaSort(key)}>
+      <button type="button" className="area-sort" onClick={() => toggleSort(key)}>
+        {label}
+        {caret(key)}
+      </button>
+    </th>
+  );
+
+  return (
+    <table className="area-table">
+      <thead>
+        <tr>
+          {header('field', 'Field')}
+          {header('S', 'Single')}
+          {header('D', 'Double')}
+          {header('T', 'Treble')}
+        </tr>
+      </thead>
+      <tbody>
+        {sorted.map((r) => (
+          <tr key={r.label}>
+            <td className="area-name">{r.label}</td>
+            {cell(r.S)}
+            {cell(r.D)}
+            {cell(r.T)}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

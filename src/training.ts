@@ -217,3 +217,98 @@ export function trainingFieldStats(matches: Match[], playerId: string): Training
 export function isTrainingTurnOpen(turn: Turn | undefined): boolean {
   return !!turn && turn.darts.length > 0 && turn.darts[turn.darts.length - 1].score === 0;
 }
+
+// ---- Ring aggregates ----
+
+export type TrainingRing = 'all' | 'single' | 'double' | 'treble' | 'outer' | 'bull';
+
+export interface TrainingRingStat {
+  ring: TrainingRing;
+  label: string;
+  darts: number; // darts spent on resolved targets in this ring
+  resolved: number; // targets hit
+  avgDarts: number | null; // darts per hit target; null until something resolved
+}
+
+const RING_DEFS: readonly { ring: TrainingRing; label: string }[] = [
+  { ring: 'all', label: 'All Targets' },
+  { ring: 'single', label: 'Singles' },
+  { ring: 'double', label: 'Doubles' },
+  { ring: 'treble', label: 'Trebles' },
+  { ring: 'outer', label: 'Outer' },
+  { ring: 'bull', label: 'Bull' },
+];
+
+/** Outer and bull count as their own rings, not as a single/double. */
+export function trainingRingOf(fieldId: string): TrainingRing {
+  if (fieldId === 'S25') return 'outer';
+  if (fieldId === 'D25') return 'bull';
+  return fieldId.startsWith('D') ? 'double' : fieldId.startsWith('T') ? 'treble' : 'single';
+}
+
+/**
+ * Average darts to hit a target, split by ring (plus the all-rings figure).
+ * Resolved attempts only, like the headline Avg Darts / Target — an open
+ * attempt's cost isn't known yet. Note this is exactly 1 / hit-rate over the
+ * same darts; it's kept in darts because that's the unit training scores in.
+ */
+export function trainingRingAverages(matches: Match[], playerId: string): TrainingRingStat[] {
+  const darts = new Map<TrainingRing, number>();
+  const hits = new Map<TrainingRing, number>();
+  for (const m of trainingMatchesFor(matches, playerId)) {
+    for (const a of trainingAttempts(m)) {
+      if (!a.resolved) continue;
+      for (const ring of ['all', trainingRingOf(a.target)] as const) {
+        darts.set(ring, (darts.get(ring) ?? 0) + a.darts);
+        hits.set(ring, (hits.get(ring) ?? 0) + 1);
+      }
+    }
+  }
+  return RING_DEFS.map(({ ring, label }) => {
+    const d = darts.get(ring) ?? 0;
+    const h = hits.get(ring) ?? 0;
+    return { ring, label, darts: d, resolved: h, avgDarts: h ? d / h : null };
+  });
+}
+
+/**
+ * Per-field improvement: hit % over the recent half of the player's rounds
+ * minus the earlier half (the training twin of atcTargetTrends). Requires
+ * `minDarts` at the field in BOTH halves — a delta computed from a handful
+ * of darts is noise, so those show null instead. Keyed by field id.
+ */
+export function trainingFieldTrends(
+  matches: Match[],
+  playerId: string,
+  minDarts = 5,
+): Map<string, number | null> {
+  const ms = trainingMatchesFor(matches, playerId);
+  const half = Math.floor(ms.length / 2);
+  const early = half >= 1 ? trainingFieldStats(ms.slice(0, half), playerId) : null;
+  const recent = half >= 1 ? trainingFieldStats(ms.slice(half), playerId) : null;
+  const out = new Map<string, number | null>();
+  TRAINING_FIELDS.forEach((id, i) => {
+    const e = early?.[i];
+    const r = recent?.[i];
+    const enough = e && r && e.darts >= minDarts && r.darts >= minDarts;
+    out.set(id, enough ? r.hitRate - e.hitRate : null);
+  });
+  return out;
+}
+
+/**
+ * The fields most in need of practice: lowest hit % among fields with at
+ * least `minDarts` thrown (a bad rate off two darts is noise, not a weak
+ * field), weakest first, ties broken toward the bigger sample.
+ */
+export function trainingWeakFields(
+  matches: Match[],
+  playerId: string,
+  count = 5,
+  minDarts = 5,
+): TrainingFieldStat[] {
+  return trainingFieldStats(matches, playerId)
+    .filter((f) => f.darts >= minDarts)
+    .sort((a, b) => a.hitRate - b.hitRate || b.darts - a.darts)
+    .slice(0, count);
+}
