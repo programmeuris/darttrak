@@ -43,7 +43,10 @@ Two reasons:
   split by ring (singles / doubles / trebles / outer / bull), a Focus Fields
   callout naming your weakest fields, and a sortable Single/Double/Treble
   hit-% matrix for every field where each cell carries a ▲▼ marker comparing
-  your recent rounds with the earlier ones.
+  your recent rounds with the earlier ones — halves of your whole history by
+  default, or set a trend window on the player's profile to compare the last
+  N rounds against the N before them (more responsive to current form; used
+  once 2×N rounds exist).
 - **1–4 players** per match, drawn from a saved roster; mark one as the
   device's **main player** from their profile page and they lead the roster
   with a star, are preselected for every new game, and are the default on the

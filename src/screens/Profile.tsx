@@ -3,19 +3,32 @@ import { navigate } from '../router';
 import { toast } from '../toast';
 import { Header } from '../components/Header';
 import { getPlayer, getMatchesByPlayer } from '../db';
-import { readMainPlayer, writeMainPlayer } from '../prefs';
+import { clearPref, readMainPlayer, readPref, writeMainPlayer, writePref } from '../prefs';
 import { startOrContinueTraining } from '../trainingSession';
 import type { Player } from '../types';
 
 /**
  * Per-player landing page. Analytics and history are reached from here so they
- * stay bound to a single player; the disabled Settings entry marks where future
- * per-player preferences (e.g. checkout tables) will live.
+ * stay bound to a single player, and per-player preferences (main player, the
+ * training trend window) live here rather than on the screens they affect.
  */
 export function Profile({ playerId }: { playerId: string }) {
   const [player, setPlayer] = useState<Player | null>(null);
   const [matchCount, setMatchCount] = useState(0);
   const [isMain, setIsMain] = useState(() => readMainPlayer() === playerId);
+  const [trendWindow, setTrendWindow] = useState(
+    () => readPref(`trainingTrendWindow:${playerId}`) ?? '',
+  );
+
+  // The training tab's ▲▼ markers compare round halves by default; a window
+  // of N compares the last N rounds against the N before them instead.
+  // Digits only, no leading zero — empty means "halves of all rounds".
+  function changeTrendWindow(raw: string) {
+    const digits = raw.replace(/\D/g, '').replace(/^0+/, '').slice(0, 3);
+    setTrendWindow(digits);
+    if (digits) writePref(`trainingTrendWindow:${playerId}`, digits);
+    else clearPref(`trainingTrendWindow:${playerId}`);
+  }
 
   // The main-player setting lives here, on the player's own page, rather than
   // as a tap target in the roster list — deliberate to set, hard to fat-finger.
@@ -88,10 +101,28 @@ export function Profile({ playerId }: { playerId: string }) {
         <button className="btn" aria-pressed={isMain} onClick={toggleMain}>
           {isMain ? '★ Main player' : '☆ Set as main player'}
         </button>
-        <button className="btn" disabled title="Coming soon">
-          Settings · coming soon
-        </button>
       </div>
+
+      <section className="card">
+        <h2 className="card-title">Stats Settings</h2>
+        <label className="field-label" htmlFor="trend-window">
+          Training improvement window (rounds)
+        </label>
+        <input
+          id="trend-window"
+          className="text-input"
+          inputMode="numeric"
+          placeholder="All rounds (compare halves)"
+          value={trendWindow}
+          onChange={(e) => changeTrendWindow(e.target.value)}
+        />
+        <p className="muted">
+          The ▲▼ markers on the training stats compare your recent rounds with earlier ones. Set a
+          window of N to compare the last N rounds against the N before them — more responsive to
+          current form. Empty compares the first and last halves of all your rounds; a window also
+          falls back to that until 2×N rounds exist.
+        </p>
+      </section>
     </div>
   );
 }

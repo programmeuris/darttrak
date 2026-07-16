@@ -228,6 +228,38 @@ describe('round stats', () => {
     expect(trainingFieldTrends([early], A).get('T20')).toBeNull();
   });
 
+  it('a trend window compares the last N rounds with the N before, else falls back to halves', () => {
+    // Four rounds of T20 form, 10 darts each: 10%, 10%, 50%, 20%.
+    const tenPercent = (id: string, date: number) =>
+      trainingMatch(id, date, [makeTurn(A, attempt('T20', 9), 0)], true);
+    const rounds = [
+      tenPercent('w1', 1000),
+      tenPercent('w2', 2000),
+      trainingMatch(
+        'w3',
+        3000,
+        Array.from({ length: 5 }, () => makeTurn(A, attempt('T20', 1), 0)),
+        true,
+      ),
+      trainingMatch(
+        'w4',
+        4000,
+        [
+          makeTurn(A, attempt('T20', 3), 0),
+          makeTurn(A, attempt('T20', 4), 0),
+          makeTurn(A, [dart(0, '✗T20')], 0),
+        ],
+        true,
+      ),
+    ];
+    // Halves: 2/20 (10%) vs 7/20 (35%) → +25.
+    expect(trainingFieldTrends(rounds, A).get('T20')).toBe(25);
+    // Window 1: only w4 (20%) vs w3 (50%) → -30; older rounds don't dilute it.
+    expect(trainingFieldTrends(rounds, A, 5, 1).get('T20')).toBe(-30);
+    // Window 3 needs 6 rounds — falls back to the halves split.
+    expect(trainingFieldTrends(rounds, A, 5, 3).get('T20')).toBe(25);
+  });
+
   it('counts every dart toward per-field stats, misses on open attempts included', () => {
     const fields = new Map(trainingFieldStats([m1], A).map((f) => [f.id, f]));
     expect(fields.get('T20')).toMatchObject({ darts: 3, hits: 1 });

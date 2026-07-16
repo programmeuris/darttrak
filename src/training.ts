@@ -272,20 +272,32 @@ export function trainingRingAverages(matches: Match[], playerId: string): Traini
 }
 
 /**
- * Per-field improvement: hit % over the recent half of the player's rounds
- * minus the earlier half (the training twin of atcTargetTrends). Requires
- * `minDarts` at the field in BOTH halves — a delta computed from a handful
- * of darts is noise, so those show null instead. Keyed by field id.
+ * Per-field improvement: hit % over the player's recent rounds minus their
+ * earlier ones (the training twin of atcTargetTrends). By default the rounds
+ * split into halves — maximum sample, but ever-less responsive as history
+ * grows. Passing `window` compares the last `window` rounds against the
+ * `window` before them instead, which stays equally sensitive forever; while
+ * the history can't fill both windows it falls back to the halves split.
+ * Either way a field needs `minDarts` on BOTH sides — a delta computed from
+ * a handful of darts is noise, so those show null. Keyed by field id.
  */
 export function trainingFieldTrends(
   matches: Match[],
   playerId: string,
   minDarts = 5,
+  window: number | null = null,
 ): Map<string, number | null> {
   const ms = trainingMatchesFor(matches, playerId);
-  const half = Math.floor(ms.length / 2);
-  const early = half >= 1 ? trainingFieldStats(ms.slice(0, half), playerId) : null;
-  const recent = half >= 1 ? trainingFieldStats(ms.slice(half), playerId) : null;
+  let early: TrainingFieldStat[] | null = null;
+  let recent: TrainingFieldStat[] | null = null;
+  if (window != null && window >= 1 && ms.length >= window * 2) {
+    early = trainingFieldStats(ms.slice(-2 * window, -window), playerId);
+    recent = trainingFieldStats(ms.slice(-window), playerId);
+  } else {
+    const half = Math.floor(ms.length / 2);
+    early = half >= 1 ? trainingFieldStats(ms.slice(0, half), playerId) : null;
+    recent = half >= 1 ? trainingFieldStats(ms.slice(half), playerId) : null;
+  }
   const out = new Map<string, number | null>();
   TRAINING_FIELDS.forEach((id, i) => {
     const e = early?.[i];
