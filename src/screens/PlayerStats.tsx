@@ -1195,7 +1195,7 @@ function Training({ matches, playerId }: { matches: Match[]; playerId: string })
       <section className="card">
         <h2 className="card-title">Hit % Per Field</h2>
         <p className="muted">
-          Across all training. Tap a column to sort; tap and hold a cell for its hits/darts.
+          Across all training. Tap a column to sort; tap a cell to see its hits/darts.
         </p>
         <TrainingMatrix matches={matches} playerId={playerId} window={effectiveWindow} />
         <p className="muted">
@@ -1231,6 +1231,7 @@ function TrainingMatrix({
 }) {
   const [sortKey, setSortKey] = useState<FieldSortKey>('field');
   const [sortDir, setSortDir] = useState<AreaSortDir>('asc');
+  const [detail, setDetail] = useState<string | null>(null);
 
   const fields = new Map(trainingFieldStats(matches, playerId).map((f) => [f.id, f]));
   const trends = trainingFieldTrends(matches, playerId, 5, window);
@@ -1283,18 +1284,28 @@ function TrainingMatrix({
     return sortDir === 'asc' ? cmp : -cmp;
   });
 
+  // Tapping a cell swaps its % for the underlying hits/darts (and back).
+  // A plain tap, not press-and-hold: title tooltips don't exist on touch
+  // devices, where a long-press summons the OS text selection instead.
   const cell = ({ id, stat }: { id: string; stat?: TrainingFieldStat }) => {
     if (!stat || stat.darts === 0) return <td className="num">—</td>;
     const delta = trends.get(id) ?? null;
     return (
-      <td className="num" title={`${stat.hits}/${stat.darts}`}>
-        {stat.hitRate.toFixed(0)}%
-        {delta !== null && Math.round(delta) !== 0 && (
-          <span className={`cell-trend ${delta > 0 ? 'good' : 'bad'}`}>
-            {delta > 0 ? '▲' : '▼'}
-            {Math.abs(delta).toFixed(0)}
-          </span>
-        )}
+      <td className="num">
+        <button
+          type="button"
+          className="cell-btn"
+          title={`${stat.hits}/${stat.darts}`}
+          onClick={() => setDetail((d) => (d === id ? null : id))}
+        >
+          {detail === id ? `${stat.hits}/${stat.darts}` : `${stat.hitRate.toFixed(0)}%`}
+          {delta !== null && Math.round(delta) !== 0 && (
+            <span className={`cell-trend ${delta > 0 ? 'good' : 'bad'}`}>
+              {delta > 0 ? '▲' : '▼'}
+              {Math.abs(delta).toFixed(0)}
+            </span>
+          )}
+        </button>
       </td>
     );
   };
