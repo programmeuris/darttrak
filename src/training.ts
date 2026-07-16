@@ -26,6 +26,27 @@ export const TRAINING_FIELDS: readonly string[] = (() => {
 
 export const TRAINING_FIELD_COUNT = TRAINING_FIELDS.length; // 62
 
+// ---- Variants ----
+// Kitchen Sink ('sink'): throw at the target until you hit it, then move on —
+// everything AND the kitchen sink, once. Group Therapy ('group'): exactly
+// GROUP_VISIT_DARTS darts at every target, hit or miss, then move on; the
+// score is how many of the visit landed. Same bag, same records.
+
+export type TrainingVariant = 'sink' | 'group';
+
+export const TRAINING_VARIANT_LABELS: Record<TrainingVariant, string> = {
+  sink: 'Kitchen Sink',
+  group: 'Group Therapy',
+};
+
+/** Darts per visit in Group Therapy: throw all three, then move on. */
+export const GROUP_VISIT_DARTS = 3;
+
+/** Records predating the variant field are Kitchen Sink rounds. */
+export function trainingVariantOf(match: Match): TrainingVariant {
+  return match.training?.variant === 'group' ? 'group' : 'sink';
+}
+
 /** Display label, matching the app's convention: plain = single. */
 export function trainingFieldLabel(id: string): string {
   if (id === 'S25') return 'Outer';
@@ -59,6 +80,9 @@ export interface TrainingState {
   // optional because records predating the target wheel lack it (healed on
   // load). Its first field never equals this round's last (see nextRoundBag).
   nextBag?: string[];
+  // Which training variant this round is; missing means Kitchen Sink
+  // (records predate the field — read through trainingVariantOf).
+  variant?: TrainingVariant;
 }
 
 /** The final field of the round in its current order (the seam's left side). */
@@ -82,10 +106,13 @@ export function nextRoundBag(
   return bag;
 }
 
-export function newTrainingState(random?: () => number): TrainingState {
+export function newTrainingState(
+  random?: () => number,
+  variant: TrainingVariant = 'sink',
+): TrainingState {
   const bag = shuffledBag(random);
   const target = bag.shift()!;
-  return { target, bag, nextBag: nextRoundBag(lastFieldOf({ target, bag }), random) };
+  return { target, bag, nextBag: nextRoundBag(lastFieldOf({ target, bag }), random), variant };
 }
 
 /**
@@ -95,7 +122,7 @@ export function newTrainingState(random?: () => number): TrainingState {
 export function advanceTraining(state: TrainingState): TrainingState | null {
   if (state.bag.length === 0) return null;
   const bag = [...state.bag];
-  return { target: bag.shift()!, bag, nextBag: state.nextBag };
+  return { target: bag.shift()!, bag, nextBag: state.nextBag, variant: state.variant };
 }
 
 // ---- Stats ----
@@ -103,6 +130,8 @@ export function advanceTraining(state: TrainingState): TrainingState | null {
 export interface TrainingAttempt {
   target: string; // field id
   darts: number; // throws taken so far (including the hit when resolved)
+  hits: number; // scored darts (0 or 1 in Kitchen Sink; 0–3 in Group Therapy)
+  firstHit: boolean; // the very first dart of the attempt landed
   resolved: boolean; // false = the live target of an in-progress round
   timestamp: number;
 }
@@ -118,6 +147,7 @@ export function trainingMatchesFor(matches: Match[], playerId: string): Match[] 
 }
 
 export function trainingAttempts(match: Match): TrainingAttempt[] {
+  const variant = trainingVariantOf(match);
   const out: TrainingAttempt[] = [];
   for (const leg of match.legs) {
     for (const turn of leg.turns) {
@@ -125,7 +155,14 @@ export function trainingAttempts(match: Match): TrainingAttempt[] {
       out.push({
         target: fieldIdFromLabel(turn.darts[0].label),
         darts: turn.darts.length,
-        resolved: turn.darts[turn.darts.length - 1].score > 0,
+        hits: turn.darts.filter((d) => d.score > 0).length,
+        firstHit: turn.darts[0].score > 0,
+        // Kitchen Sink attempts end on the hit; Group Therapy visits end
+        // when all their darts are thrown, hit or not.
+        resolved:
+          variant === 'group'
+            ? turn.darts.length >= GROUP_VISIT_DARTS
+            : turn.darts[turn.darts.length - 1].score > 0,
         timestamp: turn.timestamp,
       });
     }
@@ -136,12 +173,14 @@ export function trainingAttempts(match: Match): TrainingAttempt[] {
 export interface TrainingRound {
   date: number;
   label: string;
-  complete: boolean; // all fields hit (the record is a finished round)
+  complete: boolean; // all fields visited (the record is a finished round)
   attempts: number; // attempts with at least one dart, unresolved included
-  resolved: number; // targets actually hit
+  resolved: number; // targets hit (Kitchen Sink) / visits completed (Group)
   darts: number; // total darts thrown this round
+  hits: number; // total scored darts this round
   avgDarts: number; // mean darts per RESOLVED target — unbiased mid-round too
-  firstDartHitRate: number; // % of attempts hit with the very first dart
+  avgHits: number; // mean hits per RESOLVED visit (the Group Therapy score)
+  firstDartHitRate: number; // % of attempts whose very first dart landed
 }
 
 /** Per-round stats, oldest first. */
@@ -149,7 +188,7 @@ export function trainingRounds(matches: Match[], playerId: string): TrainingRoun
   return trainingMatchesFor(matches, playerId).map((m) => {
     const attempts = trainingAttempts(m);
     const resolved = attempts.filter((a) => a.resolved);
-    const firstDartHits = resolved.filter((a) => a.darts === 1).length;
+    const firstDartHits = attempts.filter((a) => a.firstHit).length;
     return {
       date: m.date,
       label: new Date(m.date).toLocaleDateString(),
@@ -157,12 +196,29 @@ export function trainingRounds(matches: Match[], playerId: string): TrainingRoun
       attempts: attempts.length,
       resolved: resolved.length,
       darts: attempts.reduce((acc, a) => acc + a.darts, 0),
+      hits: attempts.reduce((acc, a) => acc + a.hits, 0),
       avgDarts: resolved.length
         ? resolved.reduce((acc, a) => acc + a.darts, 0) / resolved.length
+        : 0,
+      avgHits: resolved.length
+        ? resolved.reduce((acc, a) => acc + a.hits, 0) / resolved.length
         : 0,
       firstDartHitRate: attempts.length ? (firstDartHits / attempts.length) * 100 : 0,
     };
   });
+}
+
+/** Most hits in a completed round — the Group Therapy personal best. */
+export function trainingBestHitsRound(
+  matches: Match[],
+  playerId: string,
+): { value: number; date: number } | null {
+  let best: { value: number; date: number } | null = null;
+  for (const round of trainingRounds(matches, playerId)) {
+    if (!round.complete) continue;
+    if (!best || round.hits > best.value) best = { value: round.hits, date: round.date };
+  }
+  return best;
 }
 
 /** Fewest darts to clear the whole board, with the round's date (null until a round completes). */
@@ -214,8 +270,18 @@ export function trainingFieldStats(matches: Match[], playerId: string): Training
   });
 }
 
-export function isTrainingTurnOpen(turn: Turn | undefined): boolean {
-  return !!turn && turn.darts.length > 0 && turn.darts[turn.darts.length - 1].score === 0;
+/**
+ * Whether the last turn is still this target's live attempt: Kitchen Sink
+ * attempts stay open until a dart lands; Group Therapy visits stay open
+ * until all their darts are thrown.
+ */
+export function isTrainingTurnOpen(
+  turn: Turn | undefined,
+  variant: TrainingVariant = 'sink',
+): boolean {
+  if (!turn || turn.darts.length === 0) return false;
+  if (variant === 'group') return turn.darts.length < GROUP_VISIT_DARTS;
+  return turn.darts[turn.darts.length - 1].score === 0;
 }
 
 // ---- Ring aggregates ----
@@ -226,8 +292,9 @@ export interface TrainingRingStat {
   ring: TrainingRing;
   label: string;
   darts: number; // darts spent on resolved targets in this ring
-  resolved: number; // targets hit
+  resolved: number; // resolved attempts (targets hit / visits completed)
   avgDarts: number | null; // darts per hit target; null until something resolved
+  avgHits: number | null; // hits per completed visit (the Group Therapy score)
 }
 
 const RING_DEFS: readonly { ring: TrainingRing; label: string }[] = [
@@ -254,20 +321,30 @@ export function trainingRingOf(fieldId: string): TrainingRing {
  */
 export function trainingRingAverages(matches: Match[], playerId: string): TrainingRingStat[] {
   const darts = new Map<TrainingRing, number>();
+  const resolved = new Map<TrainingRing, number>();
   const hits = new Map<TrainingRing, number>();
   for (const m of trainingMatchesFor(matches, playerId)) {
     for (const a of trainingAttempts(m)) {
       if (!a.resolved) continue;
       for (const ring of ['all', trainingRingOf(a.target)] as const) {
         darts.set(ring, (darts.get(ring) ?? 0) + a.darts);
-        hits.set(ring, (hits.get(ring) ?? 0) + 1);
+        resolved.set(ring, (resolved.get(ring) ?? 0) + 1);
+        hits.set(ring, (hits.get(ring) ?? 0) + a.hits);
       }
     }
   }
   return RING_DEFS.map(({ ring, label }) => {
     const d = darts.get(ring) ?? 0;
+    const r = resolved.get(ring) ?? 0;
     const h = hits.get(ring) ?? 0;
-    return { ring, label, darts: d, resolved: h, avgDarts: h ? d / h : null };
+    return {
+      ring,
+      label,
+      darts: d,
+      resolved: r,
+      avgDarts: r ? d / r : null,
+      avgHits: r ? h / r : null,
+    };
   });
 }
 

@@ -5,6 +5,7 @@ import {
   trainingFieldLabel,
   fieldIdFromLabel,
   shuffledBag,
+  isTrainingTurnOpen,
   lastFieldOf,
   nextRoundBag,
   newTrainingState,
@@ -12,10 +13,12 @@ import {
   trainingAttempts,
   trainingRounds,
   trainingBestRound,
+  trainingBestHitsRound,
   trainingFieldStats,
   trainingFieldTrends,
   trainingRingOf,
   trainingRingAverages,
+  trainingVariantOf,
   trainingWeakFields,
 } from '../src/training';
 import { makeMatch, makeLeg, makeTurn, dart } from './helpers';
@@ -85,6 +88,60 @@ describe('shuffle bag', () => {
     }
     expect(seen).toHaveLength(62);
     expect(new Set(seen).size).toBe(62);
+  });
+});
+
+describe('group therapy', () => {
+  const groupMatch = (id: string, date: number, turns: ReturnType<typeof makeTurn>[], complete = false) => {
+    const m = trainingMatch(id, date, turns, complete);
+    m.training = { target: 'S1', bag: [], variant: 'group' };
+    return m;
+  };
+  // A visit: one dart per entry, 1 = hit, 0 = miss.
+  const visit = (field: string, pattern: (0 | 1)[]) =>
+    makeTurn(
+      A,
+      pattern.map((s) => dart(s, `${s ? '✓' : '✗'}${trainingFieldLabel(field)}`)),
+      0,
+    );
+
+  it('a visit resolves after three darts, however many landed', () => {
+    const m = groupMatch('g1', 1000, [visit('T20', [1, 0, 1]), visit('S10', [0])]);
+    const [full, open] = trainingAttempts(m);
+    expect(full).toMatchObject({
+      target: 'T20',
+      darts: 3,
+      hits: 2,
+      firstHit: true,
+      resolved: true,
+    });
+    expect(open).toMatchObject({ target: 'S10', darts: 1, hits: 0, resolved: false });
+    const [round] = trainingRounds([m], A);
+    expect(round.avgHits).toBe(2);
+    expect(round.hits).toBe(2);
+    expect(round.firstDartHitRate).toBe(50);
+  });
+
+  it('tracks the most hits in a completed round as the personal best', () => {
+    const m1 = groupMatch('g2', 1000, [visit('T20', [1, 0, 0])], true);
+    const m2 = groupMatch('g3', 2000, [visit('T20', [1, 1, 0])], true);
+    expect(trainingBestHitsRound([m1, m2], A)).toEqual({ value: 2, date: 2000 });
+    // In-progress rounds never hold the record.
+    expect(trainingBestHitsRound([groupMatch('g4', 3000, [visit('T20', [1, 1, 1])])], A)).toBeNull();
+  });
+
+  it('turn-open depends on the variant', () => {
+    const hitFirst = makeTurn(A, [dart(1, '✓T20')], 0);
+    expect(isTrainingTurnOpen(hitFirst, 'sink')).toBe(false); // the hit closed it
+    expect(isTrainingTurnOpen(hitFirst, 'group')).toBe(true); // 1 of 3 darts thrown
+    expect(isTrainingTurnOpen(visit('T20', [1, 1, 1]), 'group')).toBe(false);
+  });
+
+  it('records without a variant read as Kitchen Sink', () => {
+    const legacy = trainingMatch('legacy', 1000, [makeTurn(A, attempt('T20', 1), 0)]);
+    expect(trainingVariantOf(legacy)).toBe('sink');
+    legacy.training = { target: 'S1', bag: [] };
+    expect(trainingVariantOf(legacy)).toBe('sink');
   });
 });
 

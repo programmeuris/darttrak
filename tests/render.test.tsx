@@ -594,6 +594,64 @@ describe('screens render without crashing', () => {
     expect(undoAction().disabled).toBe(true);
   });
 
+  it('LiveTraining Group Therapy: three darts end a visit, medals show, undo steps back', async () => {
+    const alice = await addPlayer('Alice');
+    const m = makeMatch({
+      id: 't-group',
+      gameType: 'Training',
+      playerIds: [alice.id],
+      status: 'in_progress',
+      legs: [makeLeg('t-group', [])],
+    });
+    m.training = { target: 'D10', bag: ['S1'], nextBag: [...TRAINING_FIELDS], variant: 'group' };
+    await saveMatch(m);
+
+    const { container } = render(<LiveTraining matchId="t-group" />);
+    await screen.findByText('Group Therapy · Alice');
+    // No numpad and no whole-entry undo — just HIT and MISS, one dart each.
+    expect(screen.queryByRole('button', { name: '1' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '↶ Undo Action' })).toBeNull();
+    // The dart-of-three indicator starts at dart 1 with three empty pips.
+    expect(screen.getByText('Dart 1/3')).toBeTruthy();
+    expect(container.querySelectorAll('.visit-pips .pip')).toHaveLength(3);
+    expect(container.querySelector('.visit-pips .pip.next')).toBeTruthy();
+
+    // A hit puts the live bronze medal on the current target and fills a pip.
+    fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
+    await waitFor(() => expect(container.querySelector('.tw-item.s0.medal-1')).toBeTruthy());
+    expect(screen.getByText('Dart 2/3')).toBeTruthy();
+    expect(container.querySelector('.visit-pips .pip.hit')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'MISS ✗' }));
+    await waitFor(async () =>
+      expect((await getMatch('t-group'))!.legs[0].turns[0].darts).toHaveLength(2),
+    );
+    await waitFor(() => expect(screen.getByText('Dart 3/3')).toBeTruthy());
+    expect(container.querySelector('.visit-pips .pip.miss')).toBeTruthy();
+    // The third dart ends the visit and advances the target, hit or not.
+    fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
+    await waitFor(async () => {
+      const saved = await getMatch('t-group');
+      expect(saved!.training!.target).toBe('S1');
+      expect(saved!.legs[0].turns[0].darts.map((d) => d.score)).toEqual([1, 0, 1]);
+    });
+    // The finished visit wears silver (2 of 3) behind the new target, and
+    // the indicator resets for the fresh visit.
+    await waitFor(() => expect(container.querySelector('.tw-item.s-1.medal-2')).toBeTruthy());
+    expect(screen.getByText('Dart 1/3')).toBeTruthy();
+    expect(container.querySelector('.visit-pips .pip.hit')).toBeNull();
+
+    // Undo crosses back into the visit: its target is live again, one dart
+    // lighter, and the new target returns to the front of the bag.
+    fireEvent.click(screen.getByRole('button', { name: '↶ Undo Dart' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    await waitFor(async () => {
+      const saved = await getMatch('t-group');
+      expect(saved!.training!.target).toBe('D10');
+      expect(saved!.legs[0].turns[0].darts).toHaveLength(2);
+      expect(saved!.training!.bag).toEqual(['S1']);
+    });
+  });
+
   it('LiveTraining completes the round on the last field and rolls into a new bag', async () => {
     const alice = await addPlayer('Alice');
     const m = makeMatch({
@@ -677,7 +735,7 @@ describe('screens render without crashing', () => {
 
     render(<Home />);
     await screen.findByText('Alice');
-    fireEvent.click(screen.getByRole('button', { name: '🎓 Training' }));
+    fireEvent.click(screen.getByRole('button', { name: '🚰 Kitchen Sink' }));
 
     let roundId = '';
     await waitFor(async () => {
@@ -685,6 +743,7 @@ describe('screens render without crashing', () => {
       expect(rounds).toHaveLength(1);
       expect(rounds[0].playerIds).toEqual([alice.id]);
       expect(1 + rounds[0].training!.bag.length).toBe(62);
+      expect(rounds[0].training!.variant).toBe('sink');
       roundId = rounds[0].id;
     });
     expect(location.hash).toBe(`#/live/${roundId}`);
@@ -694,9 +753,22 @@ describe('screens render without crashing', () => {
     location.hash = '';
     render(<Home />);
     await screen.findByText('Alice');
-    fireEvent.click(screen.getByRole('button', { name: '🎓 Training' }));
+    fireEvent.click(screen.getByRole('button', { name: '🚰 Kitchen Sink' }));
     await waitFor(() => expect(location.hash).toBe(`#/live/${roundId}`));
     expect((await getAllMatches()).filter((m) => m.gameType === 'Training')).toHaveLength(1);
+
+    // Group Therapy keeps its own separate round rather than continuing
+    // the Kitchen Sink one.
+    cleanup();
+    location.hash = '';
+    render(<Home />);
+    await screen.findByText('Alice');
+    fireEvent.click(screen.getByRole('button', { name: '🛋️ Group Therapy' }));
+    await waitFor(async () => {
+      const rounds = (await getAllMatches()).filter((m) => m.gameType === 'Training');
+      expect(rounds).toHaveLength(2);
+      expect(rounds.filter((r) => r.training!.variant === 'group')).toHaveLength(1);
+    });
   });
 
   it('Home training needs a main player when several exist, and Setup has no Training option', async () => {
@@ -704,7 +776,7 @@ describe('screens render without crashing', () => {
     await addPlayer('Bob');
     render(<Home />);
     await screen.findByText('Alice');
-    fireEvent.click(screen.getByRole('button', { name: '🎓 Training' }));
+    fireEvent.click(screen.getByRole('button', { name: '🚰 Kitchen Sink' }));
 
     await waitFor(() =>
       expect(document.getElementById('toast')!.textContent).toContain('Star a main player'),
@@ -722,12 +794,13 @@ describe('screens render without crashing', () => {
     await addPlayer('Alice');
     const bob = await addPlayer('Bob');
     render(<Profile playerId={bob.id} />);
-    fireEvent.click(await screen.findByRole('button', { name: '🎓 Training' }));
+    fireEvent.click(await screen.findByRole('button', { name: '🛋️ Group Therapy' }));
 
     await waitFor(async () => {
       const rounds = (await getAllMatches()).filter((m) => m.gameType === 'Training');
       expect(rounds).toHaveLength(1);
       expect(rounds[0].playerIds).toEqual([bob.id]);
+      expect(rounds[0].training!.variant).toBe('group');
     });
   });
 

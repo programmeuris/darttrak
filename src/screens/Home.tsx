@@ -10,6 +10,7 @@ import {
 } from '../db';
 import { readMainPlayer, writeMainPlayer } from '../prefs';
 import { startOrContinueTraining } from '../trainingSession';
+import type { TrainingVariant } from '../training';
 import type { Player, ExportBundle } from '../types';
 
 export function Home() {
@@ -97,7 +98,8 @@ export function Home() {
 
   // Training isn't a match, so it starts from Home rather than match setup:
   // straight into the main player's ongoing round (or the only player's).
-  async function startTraining() {
+  // Each variant keeps its own round.
+  async function startTraining(variant: TrainingVariant) {
     const target =
       players.find((p) => p.id === mainId) ?? (players.length === 1 ? players[0] : null);
     if (!target) {
@@ -110,7 +112,7 @@ export function Home() {
       return;
     }
     try {
-      navigate(`/live/${await startOrContinueTraining(target.id)}`);
+      navigate(`/live/${await startOrContinueTraining(target.id, variant)}`);
     } catch (err) {
       console.error(err);
       toast('Could not start training. Try again.', 'error');
@@ -190,8 +192,11 @@ export function Home() {
         <button className="btn primary big" onClick={() => navigate('/setup')}>
           🎯 New Match
         </button>
-        <button className="btn big full-row" onClick={startTraining}>
-          🎓 Training
+        <button className="btn big" onClick={() => startTraining('sink')}>
+          🚰 Kitchen Sink
+        </button>
+        <button className="btn big" onClick={() => startTraining('group')}>
+          🛋️ Group Therapy
         </button>
       </div>
 

@@ -23,30 +23,33 @@ Two reasons:
 - **Around the Clock** mode — race 1 → 20 → bull with a hit/miss tap input and a
   Any / Doubles / Trebles ring setting, plus a **Progressive** variant where
   doubles advance +2 and trebles +3 (each tracked separately in stats)
-- **Training** mode — endless solo target practice, started from the Home
-  screen (straight into the main player's round) or a player's profile, not
-  from match setup: a shuffle bag deals all 62 board fields (singles, doubles,
-  trebles, outer, bull) in random order and you throw at each until you hit it;
-  hitting the whole board completes a round and the next bag starts on your
-  next throw. The target card is a wheel: the previous and upcoming targets
-  flank the current one, and every hit spins the next target into focus — the
-  following round's order is dealt in advance, so the wheel previews straight
-  across rounds (a dashed seam marks the boundary, and the first target of a
-  round never repeats the last of the one before). Throws register on a
-  numpad: MISS records a single miss, or type
-  a count first to add that many misses at once (↵) or to record a hit with
-  that dart (HIT records the misses before it too). Undo Dart takes back one
-  throw, Undo Action the whole last entry — each with a confirming second
-  tap. Stats live in their own tab:
-  per-round darts-per-target and first-dart hit % with rolling averages and
-  trend deltas, a dated fewest-darts-per-round personal best, darts-per-target
-  split by ring (singles / doubles / trebles / outer / bull), a Focus Fields
-  callout naming your weakest fields, and a sortable Single/Double/Treble
-  hit-% matrix for every field where each cell carries a ▲▼ marker comparing
-  your recent rounds with the earlier ones — halves of your whole history by
-  default, or set a trend window on the player's profile to compare the last
-  N rounds against the N before them (more responsive to current form; used
-  once 2×N rounds exist).
+- **Training** — endless solo target practice in two variants, each started
+  from the Home screen (straight into the main player's round) or a player's
+  profile, not from match setup, and each keeping its own ongoing round. A
+  shuffle bag deals all 62 board fields (singles, doubles, trebles, outer,
+  bull) in random order; visiting the whole board completes a round and the
+  next bag starts on your next throw. **Kitchen Sink** is accuracy practice:
+  throw at each target until you hit it, then move on — throws register on a
+  numpad (MISS records one miss, or type a count to add that many misses at
+  once (↵) or to record a hit with that dart), with Undo Dart / Undo Action
+  taking back one throw or the whole last entry. **Group Therapy** is
+  grouping practice: exactly three darts at every target, hit or miss, then
+  move on — one HIT/MISS tap per dart, and each visited target wears a
+  bronze, silver, or gold outline for 1, 2, or 3 hits. In both, the target
+  card is a wheel: the previous and upcoming targets flank the current one,
+  every advance spins the next target into focus, and the following round's
+  order is dealt up front so the wheel previews straight across rounds (a
+  dashed seam marks the boundary, and the first target of a round never
+  repeats the last of the one before). Stats live in their own tab with a
+  variant selector: per-round pace (darts-per-target, or hits-per-visit for
+  Group Therapy) and first-dart hit % with rolling averages and trend deltas,
+  a dated personal best (fewest darts, or most hits), the pace split by ring
+  (singles / doubles / trebles / outer / bull), a Focus Fields callout naming
+  your weakest fields, and a sortable Single/Double/Treble hit-% matrix where
+  each cell carries a ▲▼ marker comparing your recent rounds with the earlier
+  ones — halves of your whole history by default, or set a trend window on
+  the player's profile to compare the last N rounds against the N before
+  them (more responsive to current form; used once 2×N rounds exist).
 - **1–4 players** per match, drawn from a saved roster; mark one as the
   device's **main player** from their profile page and they lead the roster
   with a star, are preselected for every new game, and are the default on the

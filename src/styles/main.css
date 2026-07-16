@@ -515,6 +515,51 @@ body {
   left: 120%;
   opacity: 0;
 }
+/* Group Therapy: wheel targets wear their visit's medal — bronze, silver,
+   gold for 1, 2, 3 hits. Every item in the group wheel reserves the pill
+   space so gaining a medal never shifts the strip. */
+.target-wheel.group .tw-item {
+  padding: 0 0.25em;
+  border: 2px solid transparent;
+  border-radius: 14px;
+}
+.tw-item.medal-1 {
+  border-color: #cd7f32;
+}
+.tw-item.medal-2 {
+  border-color: #c0c0c0;
+}
+.tw-item.medal-3 {
+  border-color: #ffd700;
+}
+/* Group Therapy: one pip per visit dart — hit, miss, or still in hand. */
+.visit-pips {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.visit-pips .pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  opacity: 0.45;
+}
+.visit-pips .pip.next {
+  border-color: var(--text);
+  opacity: 1;
+}
+.visit-pips .pip.hit {
+  background: var(--success);
+  border-color: var(--success);
+  opacity: 1;
+}
+.visit-pips .pip.miss {
+  background: var(--danger-strong);
+  border-color: var(--danger-strong);
+  opacity: 1;
+}
 /* The seam: each round's first target carries the break between rounds. */
 .tw-item.seam::before {
   content: '';

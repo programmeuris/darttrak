@@ -5,6 +5,7 @@ import { Header } from '../components/Header';
 import { getPlayer, getMatchesByPlayer } from '../db';
 import { clearPref, readMainPlayer, readPref, writeMainPlayer, writePref } from '../prefs';
 import { startOrContinueTraining } from '../trainingSession';
+import type { TrainingVariant } from '../training';
 import type { Player } from '../types';
 
 /**
@@ -28,6 +29,15 @@ export function Profile({ playerId }: { playerId: string }) {
     setTrendWindow(digits);
     if (digits) writePref(`trainingTrendWindow:${playerId}`, digits);
     else clearPref(`trainingTrendWindow:${playerId}`);
+  }
+
+  async function startTraining(variant: TrainingVariant) {
+    try {
+      navigate(`/live/${await startOrContinueTraining(playerId, variant)}`);
+    } catch (err) {
+      console.error(err);
+      toast('Could not start training. Try again.', 'error');
+    }
   }
 
   // The main-player setting lives here, on the player's own page, rather than
@@ -82,18 +92,11 @@ export function Profile({ playerId }: { playerId: string }) {
         <button className="btn primary big" onClick={() => navigate(`/player/${playerId}/stats`)}>
           📊 Analytics
         </button>
-        <button
-          className="btn"
-          onClick={async () => {
-            try {
-              navigate(`/live/${await startOrContinueTraining(playerId)}`);
-            } catch (err) {
-              console.error(err);
-              toast('Could not start training. Try again.', 'error');
-            }
-          }}
-        >
-          🎓 Training
+        <button className="btn" onClick={() => startTraining('sink')}>
+          🚰 Kitchen Sink
+        </button>
+        <button className="btn" onClick={() => startTraining('group')}>
+          🛋️ Group Therapy
         </button>
         <button className="btn" onClick={() => navigate(`/player/${playerId}/history`)}>
           History
