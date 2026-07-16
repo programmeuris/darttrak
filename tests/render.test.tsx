@@ -590,7 +590,7 @@ describe('screens render without crashing', () => {
     m.training = { target: 'S3', bag: [], nextBag: [...TRAINING_FIELDS] };
     await saveMatch(m);
 
-    render(<LiveTraining matchId="t-final" />);
+    const { container } = render(<LiveTraining matchId="t-final" />);
     // '3' matches the numpad's digit too — pin the lookup to the wheel focus.
     await screen.findByText('3', { selector: '.tw-item.s0' });
     fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
@@ -601,7 +601,8 @@ describe('screens render without crashing', () => {
       expect(finished!.winnerId).toBe(alice.id);
     });
     // A fresh round exists, dealt in the pre-generated order the wheel was
-    // showing, and we navigated to it.
+    // showing. Navigation waits for the boundary spin: meanwhile the next
+    // round's opener already holds the wheel's focus, seam attached.
     const fresh = (await getAllMatches()).find(
       (x) => x.gameType === 'Training' && x.status === 'in_progress',
     );
@@ -609,7 +610,12 @@ describe('screens render without crashing', () => {
     expect(fresh!.training!.target).toBe('S1'); // = nextBag[0]
     expect(1 + fresh!.training!.bag.length).toBe(62);
     expect(fresh!.training!.nextBag).toHaveLength(62);
-    expect(location.hash).toBe(`#/live/${fresh!.id}`);
+    await waitFor(() => {
+      const focus = container.querySelector('.tw-item.s0');
+      expect(focus?.textContent).toBe('1');
+      expect(focus?.className).toContain('seam');
+    });
+    await waitFor(() => expect(location.hash).toBe(`#/live/${fresh!.id}`));
   });
 
   it('LiveTraining continues the wheel across rounds: the previous round trails behind', async () => {

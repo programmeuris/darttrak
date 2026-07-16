@@ -21,6 +21,11 @@ import type { Match, Player, Turn } from '../types';
 const MAX_PENDING_DIGITS = 3;
 // How long an armed undo stays primed before it relaxes back to safe.
 const UNDO_CONFIRM_MS = 3000;
+// How long the round-boundary spin plays before navigating to the fresh
+// round: the wheel's CSS transition (0.35s) plus a little settle time. The
+// spin's final frame matches the fresh round's first render exactly, so the
+// remount is invisible.
+const WHEEL_SPIN_MS = 450;
 
 export function LiveTraining({ matchId }: { matchId: string }) {
   const [match, setMatch] = useState<Match | null>(null);
@@ -39,6 +44,11 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   const [saving, setSaving] = useState(false);
   const [undoArmed, setUndoArmed] = useState<'dart' | 'action' | null>(null);
   const undoArmTimer = useRef<number | undefined>(undefined);
+  // True from the round-completing save until navigation to the fresh round:
+  // the boundary spin is playing on the completed record, and no input may
+  // land on it in the meantime.
+  const rolling = useRef(false);
+  const rolloverTimer = useRef<number | undefined>(undefined);
   // How many darts the last numpad entry added. Undo Action reverts exactly
   // that many; any other edit (an undo, a remount) invalidates the memory.
   const [lastAction, setLastAction] = useState(0);
@@ -98,7 +108,13 @@ export function LiveTraining({ matchId }: { matchId: string }) {
     };
   }, [matchId]);
 
-  useEffect(() => () => window.clearTimeout(undoArmTimer.current), []);
+  useEffect(
+    () => () => {
+      window.clearTimeout(undoArmTimer.current);
+      window.clearTimeout(rolloverTimer.current);
+    },
+    [],
+  );
 
   if (!match) return <div className="screen" />;
 
@@ -120,23 +136,32 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   // recurring in the next round can't collide; the first target of each
   // round carries the seam marker (the visible break between rounds).
   const resolvedTargets = resolved.map((a) => a.target);
+  const nextRound = (training.nextBag ?? []).map((f, i) => ({
+    field: f,
+    key: `${match.id}:n:${f}`,
+    seam: i === 0,
+  }));
   const past = [
     ...prevTail.map((f) => ({ field: f, key: `p:${f}`, seam: false })),
     ...resolvedTargets.map((f, i) => ({ field: f, key: `${match.id}:${f}`, seam: i === 0 })),
   ];
-  const current = {
-    field: training.target,
-    key: `${match.id}:${training.target}`,
-    seam: resolvedTargets.length === 0,
-  };
-  const ahead = [
-    ...training.bag.map((f) => ({ field: f, key: `${match.id}:${f}`, seam: false })),
-    ...(training.nextBag ?? []).map((f, i) => ({
-      field: f,
-      key: `${match.id}:n:${f}`,
-      seam: i === 0,
-    })),
-  ];
+  // While the round-boundary spin plays (the record just completed, the
+  // final target is already in `past`), the next round's opener holds focus;
+  // navigation to the real fresh round follows at spin end.
+  const rolled = match.status === 'completed';
+  const current = rolled
+    ? nextRound[0]
+    : {
+        field: training.target,
+        key: `${match.id}:${training.target}`,
+        seam: resolvedTargets.length === 0,
+      };
+  const ahead = rolled
+    ? nextRound.slice(1)
+    : [
+        ...training.bag.map((f) => ({ field: f, key: `${match.id}:${f}`, seam: false })),
+        ...nextRound,
+      ];
   const wheel = [
     { slot: -2, entry: past[past.length - 2] },
     { slot: -1, entry: past[past.length - 1] },
@@ -152,7 +177,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   }
 
   function pressUndo(kind: 'dart' | 'action') {
-    if (!match || saving) return;
+    if (!match || saving || rolling.current) return;
     if (undoArmed !== kind) {
       setUndoArmed(kind);
       window.clearTimeout(undoArmTimer.current);
@@ -165,7 +190,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   }
 
   async function registerDarts(misses: number, hit: boolean) {
-    if (!match || submitting.current) return;
+    if (!match || submitting.current || rolling.current) return;
     if (misses <= 0 && !hit) return;
     disarmUndo();
     submitting.current = true;
@@ -220,7 +245,14 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         const fresh = newTrainingRound(next.playerIds[0], next.training!.nextBag);
         await saveMatch(fresh);
         toast(`Board complete in ${darts} darts!`);
-        navigate(`/live/${fresh.id}`, { replace: true });
+        // Render the completed record so the wheel spins across the seam,
+        // then navigate: the remount lands on the identical frame.
+        rolling.current = true;
+        setMatch(next);
+        rolloverTimer.current = window.setTimeout(
+          () => navigate(`/live/${fresh.id}`, { replace: true }),
+          WHEEL_SPIN_MS,
+        );
         return;
       }
       setLastAction(misses + (hit ? 1 : 0));
@@ -235,7 +267,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   }
 
   async function undoDart() {
-    if (!match || submitting.current) return;
+    if (!match || submitting.current || rolling.current) return;
     submitting.current = true;
     setSaving(true);
     try {
@@ -303,7 +335,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   // tail of the last turn: `lastAction` is only ever set by a registerDarts
   // that stayed on this round, and every undo path clears it.
   async function undoAction() {
-    if (!match || submitting.current || lastAction <= 0) return;
+    if (!match || submitting.current || rolling.current || lastAction <= 0) return;
     submitting.current = true;
     setSaving(true);
     try {
