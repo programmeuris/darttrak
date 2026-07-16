@@ -7,7 +7,9 @@ import {
   advanceTraining,
   fieldIdFromLabel,
   isTrainingTurnOpen,
+  lastFieldOf,
   newTrainingState,
+  nextRoundBag,
   trainingAttempts,
   trainingFieldLabel,
 } from '../training';
@@ -23,6 +25,10 @@ const UNDO_CONFIRM_MS = 3000;
 export function LiveTraining({ matchId }: { matchId: string }) {
   const [match, setMatch] = useState<Match | null>(null);
   const [playerName, setPlayerName] = useState('');
+  // The previous round's last two targets: they fill the wheel's trailing
+  // slots at the start of a round, so the strip reads continuously across
+  // the seam instead of starting empty.
+  const [prevTail, setPrevTail] = useState<string[]>([]);
   // Bumped on every registered entry; the flash overlay is keyed by it so the
   // "darts landed" animation replays even when adds come in quick succession.
   const [flashKey, setFlashKey] = useState(0);
@@ -55,9 +61,30 @@ export function LiveTraining({ matchId }: { matchId: string }) {
       if (!m.training) {
         m.training = newTrainingState();
         await saveMatch(m);
+      } else if (!m.training.nextBag) {
+        // Records predating the target wheel lack the pre-dealt next round.
+        m.training = { ...m.training, nextBag: nextRoundBag(lastFieldOf(m.training)) };
+        await saveMatch(m);
       }
       const players = await getPlayers();
+      const prev = (await getAllMatches())
+        .filter(
+          (x) =>
+            x.gameType === 'Training' &&
+            x.status === 'completed' &&
+            x.playerIds[0] === m.playerIds[0] &&
+            x.id !== m.id,
+        )
+        .sort((a, b) => b.date - a.date)[0];
       if (!active) return;
+      setPrevTail(
+        prev
+          ? trainingAttempts(prev)
+              .filter((a) => a.resolved)
+              .map((a) => a.target)
+              .slice(-2)
+          : [],
+      );
       setPlayerName(players.find((p: Player) => p.id === m.playerIds[0])?.name ?? 'Unknown');
       setMatch(m);
     })().catch((err) => {
@@ -83,6 +110,40 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   const resolved = attempts.filter((a) => a.resolved);
   const dartsThisRound = attempts.reduce((acc, a) => acc + a.darts, 0);
   const targetLabel = trainingFieldLabel(training.target);
+
+  // ---- Target wheel ----
+  // One continuous strip: previous round's tail, this round's resolved
+  // targets, the current one, the rest of the bag, then the pre-dealt next
+  // round. Five slots render (two of them offscreen), so every visible move
+  // on a hit or undo is a CSS transition of an already-mounted element —
+  // entries and exits happen out of sight. Keys carry the round so a field
+  // recurring in the next round can't collide; the first target of each
+  // round carries the seam marker (the visible break between rounds).
+  const resolvedTargets = resolved.map((a) => a.target);
+  const past = [
+    ...prevTail.map((f) => ({ field: f, key: `p:${f}`, seam: false })),
+    ...resolvedTargets.map((f, i) => ({ field: f, key: `${match.id}:${f}`, seam: i === 0 })),
+  ];
+  const current = {
+    field: training.target,
+    key: `${match.id}:${training.target}`,
+    seam: resolvedTargets.length === 0,
+  };
+  const ahead = [
+    ...training.bag.map((f) => ({ field: f, key: `${match.id}:${f}`, seam: false })),
+    ...(training.nextBag ?? []).map((f, i) => ({
+      field: f,
+      key: `${match.id}:n:${f}`,
+      seam: i === 0,
+    })),
+  ];
+  const wheel = [
+    { slot: -2, entry: past[past.length - 2] },
+    { slot: -1, entry: past[past.length - 1] },
+    { slot: 0, entry: current },
+    { slot: 1, entry: ahead[0] },
+    { slot: 2, entry: ahead[1] },
+  ].filter((w) => w.entry);
 
   function disarmUndo() {
     window.clearTimeout(undoArmTimer.current);
@@ -155,7 +216,8 @@ export function LiveTraining({ matchId }: { matchId: string }) {
       setFlashKey((k) => k + 1);
       if (finishedRound) {
         const darts = trainingAttempts(next).reduce((acc, a) => acc + a.darts, 0);
-        const fresh = newTrainingRound(next.playerIds[0]);
+        // Deal the round from the pre-dealt order the wheel has been showing.
+        const fresh = newTrainingRound(next.playerIds[0], next.training!.nextBag);
         await saveMatch(fresh);
         toast(`Board complete in ${darts} darts!`);
         navigate(`/live/${fresh.id}`, { replace: true });
@@ -220,6 +282,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         next.training = {
           target: fieldIdFromLabel(popped.label),
           bag: [next.training!.target, ...next.training!.bag],
+          nextBag: next.training!.nextBag,
         };
       }
       if (turn.darts.length === 0) nextLeg.turns.pop();
@@ -255,6 +318,7 @@ export function LiveTraining({ matchId }: { matchId: string }) {
           next.training = {
             target: fieldIdFromLabel(popped.label),
             bag: [next.training!.target, ...next.training!.bag],
+            nextBag: next.training!.nextBag,
           };
         }
       }
@@ -300,7 +364,16 @@ export function LiveTraining({ matchId }: { matchId: string }) {
           <span className="sc-name">Current target</span>
           {openDarts > 0 && <span className="sc-legs">{openDarts} thrown</span>}
         </div>
-        <div className="sc-target">{targetLabel}</div>
+        <div className="target-wheel">
+          {wheel.map(({ slot, entry }) => (
+            <div
+              key={entry.key}
+              className={`tw-item s${slot}${entry.seam ? ' seam' : ''}`}
+            >
+              {trainingFieldLabel(entry.field)}
+            </div>
+          ))}
+        </div>
         <div className="atc-progress">
           <div
             className="atc-progress-fill"
