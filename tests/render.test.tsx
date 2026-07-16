@@ -611,14 +611,22 @@ describe('screens render without crashing', () => {
     // No numpad and no whole-entry undo — just HIT and MISS, one dart each.
     expect(screen.queryByRole('button', { name: '1' })).toBeNull();
     expect(screen.queryByRole('button', { name: '↶ Undo Action' })).toBeNull();
+    // The dart-of-three indicator starts at dart 1 with three empty pips.
+    expect(screen.getByText('Dart 1/3')).toBeTruthy();
+    expect(container.querySelectorAll('.visit-pips .pip')).toHaveLength(3);
+    expect(container.querySelector('.visit-pips .pip.next')).toBeTruthy();
 
-    // A hit puts the live bronze medal on the current target.
+    // A hit puts the live bronze medal on the current target and fills a pip.
     fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
     await waitFor(() => expect(container.querySelector('.tw-item.s0.medal-1')).toBeTruthy());
+    expect(screen.getByText('Dart 2/3')).toBeTruthy();
+    expect(container.querySelector('.visit-pips .pip.hit')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'MISS ✗' }));
     await waitFor(async () =>
       expect((await getMatch('t-group'))!.legs[0].turns[0].darts).toHaveLength(2),
     );
+    await waitFor(() => expect(screen.getByText('Dart 3/3')).toBeTruthy());
+    expect(container.querySelector('.visit-pips .pip.miss')).toBeTruthy();
     // The third dart ends the visit and advances the target, hit or not.
     fireEvent.click(screen.getByRole('button', { name: 'HIT ✓' }));
     await waitFor(async () => {
@@ -626,8 +634,11 @@ describe('screens render without crashing', () => {
       expect(saved!.training!.target).toBe('S1');
       expect(saved!.legs[0].turns[0].darts.map((d) => d.score)).toEqual([1, 0, 1]);
     });
-    // The finished visit wears silver (2 of 3) behind the new target.
+    // The finished visit wears silver (2 of 3) behind the new target, and
+    // the indicator resets for the fresh visit.
     await waitFor(() => expect(container.querySelector('.tw-item.s-1.medal-2')).toBeTruthy());
+    expect(screen.getByText('Dart 1/3')).toBeTruthy();
+    expect(container.querySelector('.visit-pips .pip.hit')).toBeNull();
 
     // Undo crosses back into the visit: its target is live again, one dart
     // lighter, and the new target returns to the front of the bag.

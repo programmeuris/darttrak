@@ -137,13 +137,15 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   const dartsThisRound = attempts.reduce((acc, a) => acc + a.darts, 0);
   const hitsThisRound = attempts.reduce((acc, a) => acc + a.hits, 0);
   const targetLabel = trainingFieldLabel(training.target);
-  // Group Therapy: the current visit's hits so far, for the live medal.
-  const liveHits =
+  // Group Therapy: the current visit's darts, for the live medal and the
+  // dart-of-three pips (empty when the open turn belongs to another target).
+  const visitDarts =
     variant === 'group' &&
     openDarts > 0 &&
     fieldIdFromLabel(lastTurn!.darts[0].label) === training.target
-      ? lastTurn!.darts.filter((d) => d.score > 0).length
-      : 0;
+      ? lastTurn!.darts
+      : [];
+  const liveHits = visitDarts.filter((d) => d.score > 0).length;
 
   // ---- Target wheel ----
   // One continuous strip: previous round's tail, this round's resolved
@@ -504,7 +506,12 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         {flashKey > 0 && <div key={flashKey} className="sc-flash" aria-hidden="true" />}
         <div className="sc-top">
           <span className="sc-name">Current target</span>
-          {openDarts > 0 && <span className="sc-legs">{openDarts} thrown</span>}
+          {variant === 'group' ? (
+            // Always visible: which of the visit's three darts is up next.
+            <span className="sc-legs">Dart {visitDarts.length + 1}/{GROUP_VISIT_DARTS}</span>
+          ) : (
+            openDarts > 0 && <span className="sc-legs">{openDarts} thrown</span>
+          )}
         </div>
         <div className={`target-wheel${variant === 'group' ? ' group' : ''}`}>
           {wheel.map(({ slot, entry }) => (
@@ -520,6 +527,18 @@ export function LiveTraining({ matchId }: { matchId: string }) {
             </div>
           ))}
         </div>
+        {variant === 'group' && (
+          // The visit at a glance: one pip per dart — hit, miss, or still
+          // in hand (the next one to throw is highlighted).
+          <div className="visit-pips">
+            {Array.from({ length: GROUP_VISIT_DARTS }, (_, i) => {
+              const d = visitDarts[i];
+              const state = d ? (d.score > 0 ? ' hit' : ' miss') : '';
+              const next = !d && i === visitDarts.length ? ' next' : '';
+              return <span key={i} className={`pip${state}${next}`} />;
+            })}
+          </div>
+        )}
         <div className="atc-progress">
           <div
             className="atc-progress-fill"
