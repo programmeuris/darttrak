@@ -64,7 +64,8 @@ Two reasons:
   update as you throw), undo-dart and undo-turn
 - **Match summary** with per-player 3-dart average, highest turn, 180s, 100+/140+
   counts, darts thrown, checkout % and best checkout
-- **Match history** with player / game-type filters and full turn-by-turn breakdowns
+- **Match history** with player / game-type / status filters (find unfinished
+  games to resume or clean up) and full turn-by-turn breakdowns
 - **Player stats** with Chart.js, organised by game mode: an **x01** mode with
   Overview, Consistency, Finishing, Scoring and Head-to-Head lenses, and an
   **Around the Clock** mode with a variant selector (Any / Doubles / Trebles /

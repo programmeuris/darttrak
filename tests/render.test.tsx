@@ -1493,6 +1493,44 @@ describe('player profiles', () => {
     // Only Alice's match is listed (Bob's solo game is excluded).
     expect(screen.getByText('Alice vs Bob')).toBeTruthy();
   });
+
+  it('History filters by status: unfinished games only', async () => {
+    const alice = await addPlayer('Alice');
+    await saveMatch(
+      makeMatch({
+        id: 'h-done',
+        date: 1000,
+        gameType: '501',
+        playerIds: [alice.id],
+        status: 'completed',
+        winnerId: alice.id,
+        legs: [makeLeg('h-done', [], alice.id)],
+      }),
+    );
+    await saveMatch(
+      makeMatch({
+        id: 'h-open',
+        date: 2000,
+        gameType: '301',
+        playerIds: [alice.id],
+        status: 'in_progress',
+        legs: [makeLeg('h-open', [])],
+      }),
+    );
+    const { container } = render(<History />);
+    const games = () =>
+      Array.from(container.querySelectorAll('.match-game')).map((el) => el.textContent);
+    await waitFor(() => expect(container.querySelectorAll('.match-row')).toHaveLength(2));
+
+    // Unfinished shows only the live match; Completed only the finished one.
+    const status = screen.getByDisplayValue('Any status');
+    fireEvent.change(status, { target: { value: 'in_progress' } });
+    expect(games()).toEqual(['301']);
+    expect(screen.getByText('In progress')).toBeTruthy();
+    fireEvent.change(status, { target: { value: 'completed' } });
+    expect(games()).toEqual(['501']);
+    expect(screen.queryByText('In progress')).toBeNull();
+  });
 });
 
 describe('LiveAtc action layout', () => {
