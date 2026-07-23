@@ -1274,12 +1274,21 @@ body {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
-/* Tiny per-cell improvement marker in the training field matrix. */
+/* Tiny per-cell improvement marker in the training field matrix. Fixed
+   width and always present (grey dashes when empty) so the percentages
+   in front of it stay column-aligned. */
 .area-table .cell-trend {
   display: inline-block;
   margin-left: 4px;
+  width: 2.6em;
+  text-align: right;
   font-size: 0.7rem;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.area-table .cell-trend.none {
+  color: var(--muted);
+  opacity: 0.55;
 }
 .area-table .cell-trend.good {
   color: var(--success-text);

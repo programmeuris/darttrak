@@ -1357,9 +1357,13 @@ function TrainingMatrix({
   // Tapping a cell swaps its % for the underlying hits/darts (and back).
   // A plain tap, not press-and-hold: title tooltips don't exist on touch
   // devices, where a long-press summons the OS text selection instead.
+  // The ▲▼ marker slot is always rendered at a fixed width — grey dashes
+  // when there's no delta, zero-padded otherwise — so the values in cells
+  // with and without markers stay aligned.
   const cell = ({ id, stat }: { id: string; stat?: TrainingFieldStat }) => {
     if (!stat || stat.darts === 0) return <td className="num">—</td>;
     const delta = trends.get(id) ?? null;
+    const rounded = delta === null ? 0 : Math.round(delta);
     return (
       <td className="num">
         <button
@@ -1369,10 +1373,12 @@ function TrainingMatrix({
           onClick={() => setDetail((d) => (d === id ? null : id))}
         >
           {detail === id ? `${stat.hits}/${stat.darts}` : `${stat.hitRate.toFixed(0)}%`}
-          {delta !== null && Math.round(delta) !== 0 && (
-            <span className={`cell-trend ${delta > 0 ? 'good' : 'bad'}`}>
-              {delta > 0 ? '▲' : '▼'}
-              {Math.abs(delta).toFixed(0)}
+          {rounded === 0 ? (
+            <span className="cell-trend none">---</span>
+          ) : (
+            <span className={`cell-trend ${rounded > 0 ? 'good' : 'bad'}`}>
+              {rounded > 0 ? '▲' : '▼'}
+              {String(Math.abs(rounded)).padStart(2, '0')}
             </span>
           )}
         </button>
