@@ -11,7 +11,7 @@ import {
   trainingFieldLabel,
   trainingVariantOf,
 } from '../training';
-import type { Match, Player, GameType } from '../types';
+import type { Match, MatchStatus, Player, GameType } from '../types';
 
 // Training records show their variant's name instead of the bare game type.
 const gameLabel = (m: Match) =>
@@ -30,6 +30,7 @@ function MatchList({ lockedPlayerId, base }: { lockedPlayerId?: string; base: st
   const [names, setNames] = useState<Map<string, string>>(new Map());
   const [playerFilter, setPlayerFilter] = useState(lockedPlayerId ?? '');
   const [gameFilter, setGameFilter] = useState<'' | GameType>('');
+  const [statusFilter, setStatusFilter] = useState<'' | MatchStatus>('');
 
   useEffect(() => {
     Promise.all([getAllMatches(), getPlayers()])
@@ -47,7 +48,8 @@ function MatchList({ lockedPlayerId, base }: { lockedPlayerId?: string; base: st
   const players = [...names.entries()];
   const list = matches
     .filter((m) => !playerFilter || m.playerIds.includes(playerFilter))
-    .filter((m) => !gameFilter || m.gameType === gameFilter);
+    .filter((m) => !gameFilter || m.gameType === gameFilter)
+    .filter((m) => !statusFilter || m.status === statusFilter);
 
   async function handleDelete(m: Match) {
     if (!confirmDialog('Delete this match permanently?')) return;
@@ -86,6 +88,15 @@ function MatchList({ lockedPlayerId, base }: { lockedPlayerId?: string; base: st
             <option value="301">301</option>
             <option value="AroundTheClock">Around the Clock</option>
             <option value="Training">Training</option>
+          </select>
+          <select
+            className="select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as '' | MatchStatus)}
+          >
+            <option value="">Any status</option>
+            <option value="in_progress">Unfinished</option>
+            <option value="completed">Completed</option>
           </select>
         </div>
       </section>
