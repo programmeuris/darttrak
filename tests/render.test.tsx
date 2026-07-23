@@ -1356,13 +1356,16 @@ describe('player profiles', () => {
     // The footnote explains the halves fallback until the window can apply.
     expect(screen.getByText(/your window of 5 takes over at 10 rounds/)).toBeTruthy();
     // Matrix: T20 hit 1/5 → 20%; the bull row's single column is the outer.
-    expect(screen.getByTitle('1/5').textContent).toBe('20%');
-    expect(screen.getByTitle('1/1').textContent).toBe('100%');
+    // One round has no trend halves, so every marker slot shows the grey
+    // dashes placeholder (fixed width — values never shift).
+    expect(screen.getByTitle('1/5').textContent).toBe('20%---');
+    expect(screen.getByTitle('1/1').textContent).toBe('100%---');
+    expect(screen.getByTitle('1/5').querySelector('.cell-trend.none')).toBeTruthy();
     // Tapping a cell swaps the % for its hits/darts; tapping again swaps back.
     fireEvent.click(screen.getByTitle('1/5'));
-    expect(screen.getByTitle('1/5').textContent).toBe('1/5');
+    expect(screen.getByTitle('1/5').textContent).toBe('1/5---');
     fireEvent.click(screen.getByTitle('1/5'));
-    expect(screen.getByTitle('1/5').textContent).toBe('20%');
+    expect(screen.getByTitle('1/5').textContent).toBe('20%---');
     // The 6-dart round is the dated best round; the volume tile is gone.
     expect(screen.getByText(/Best Round \(darts\)/).previousElementSibling!.textContent).toBe('6');
     expect(screen.queryByText('Targets Hit')).toBeNull();
@@ -1384,6 +1387,34 @@ describe('player profiles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Treble' }));
     const firstField = document.querySelector('.area-table tbody .area-name');
     expect(firstField!.textContent).toBe('20');
+  });
+
+  it('PlayerStats matrix zero-pads single-digit trend markers', async () => {
+    const alice = await addPlayer('Alice');
+    const att = (misses: number) =>
+      makeTurn(
+        alice.id,
+        [...Array.from({ length: misses }, () => dart(0, '✗T20')), dart(1, '✓T20')],
+        0,
+      );
+    const mk = (id: string, date: number, turns: ReturnType<typeof makeTurn>[]) =>
+      makeMatch({
+        id,
+        date,
+        gameType: 'Training',
+        playerIds: [alice.id],
+        winnerId: alice.id,
+        status: 'completed',
+        legs: [makeLeg(id, turns)],
+      });
+    // Earlier half: T20 at 1/10 (10%). Recent half: 2/14 (14%) → ▲04.
+    await saveMatch(mk('tr-a', 1000, [att(9)]));
+    await saveMatch(mk('tr-b', 2000, [att(9), att(3)]));
+
+    render(<PlayerStats playerId={alice.id} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Training' }));
+    await screen.findByText('Hit % Per Field');
+    expect(screen.getByTitle('3/24').textContent).toBe('13%▲04');
   });
 
   it('PlayerStats charts expand into a fullscreen viewer and close on Escape', async () => {
