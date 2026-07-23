@@ -546,6 +546,54 @@ body {
 .tw-item.medal-3 {
   border-color: #ffd700;
 }
+/* Round complete: the card trades its red pulse for a gold glow while a
+   confetti burst scatters from the target (vectors set inline per piece). */
+.score-card.active.celebrate {
+  border-color: #ffd700;
+  animation: none;
+  box-shadow: 0 0 22px 2px rgba(255, 215, 0, 0.55);
+}
+.sc-celebrate {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.sc-celebrate .confetti {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 7px;
+  height: 10px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confetti-burst 0.8s ease-out forwards;
+}
+.sc-celebrate .confetti:nth-child(3n) {
+  background: #ffd700;
+}
+.sc-celebrate .confetti:nth-child(3n + 1) {
+  background: var(--accent);
+}
+.sc-celebrate .confetti:nth-child(3n + 2) {
+  background: var(--success);
+}
+@keyframes confetti-burst {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--cx)), calc(-50% + var(--cy))) rotate(var(--cr));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sc-celebrate .confetti {
+    animation: none;
+  }
+}
+
 /* Group Therapy: one pip per visit dart — hit, miss, or still in hand. */
 .visit-pips {
   display: flex;
@@ -921,6 +969,15 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+/* The turn counter column: throw order, first at the top. */
+.turn-table .idx {
+  color: var(--muted);
+  font-size: 0.8rem;
+  width: 2.5ch;
+  text-align: right;
+  padding-right: 6px;
+  font-variant-numeric: tabular-nums;
 }
 .match-row {
   display: flex;

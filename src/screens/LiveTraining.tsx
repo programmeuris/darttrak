@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { navigate } from '../router';
 import { toast } from '../toast';
 import { getMatch, getPlayers, getAllMatches, saveMatch, deleteMatch } from '../db';
@@ -24,11 +25,11 @@ import type { Match, Player, Turn } from '../types';
 const MAX_PENDING_DIGITS = 3;
 // How long an armed undo stays primed before it relaxes back to safe.
 const UNDO_CONFIRM_MS = 3000;
-// How long the round-boundary spin plays before navigating to the fresh
-// round: the wheel's CSS transition (0.35s) plus a little settle time. The
-// spin's final frame matches the fresh round's first render exactly, so the
-// remount is invisible.
-const WHEEL_SPIN_MS = 450;
+// How long the completed round stays on screen before navigating to the
+// fresh one: enough for the wheel's boundary spin (0.35s CSS transition)
+// and the confetti burst to play. The spin's final frame matches the fresh
+// round's first render exactly, so the remount is invisible.
+const ROLLOVER_MS = 950;
 
 export function LiveTraining({ matchId }: { matchId: string }) {
   const [match, setMatch] = useState<Match | null>(null);
@@ -52,6 +53,9 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   // land on it in the meantime.
   const rolling = useRef(false);
   const rolloverTimer = useRef<number | undefined>(undefined);
+  // True while the round-complete celebration (gold glow + confetti) plays
+  // over the boundary spin.
+  const [celebrating, setCelebrating] = useState(false);
   // How many darts the last numpad entry added. Undo Action reverts exactly
   // that many; any other edit (an undo, a remount) invalidates the memory.
   const [lastAction, setLastAction] = useState(0);
@@ -351,9 +355,9 @@ export function LiveTraining({ matchId }: { matchId: string }) {
   }
 
   // Shared round rollover: deal the fresh round from the pre-dealt order the
-  // wheel has been showing, then render the completed record so the wheel
-  // spins across the seam before navigating — the remount lands on the
-  // identical frame.
+  // wheel has been showing, then celebrate on the completed record — gold
+  // glow, confetti, and the wheel spinning across the seam — before
+  // navigating; the remount lands on the identical frame.
   async function rollOver(completed: Match, message: string) {
     const fresh = newTrainingRound(
       completed.playerIds[0],
@@ -363,10 +367,11 @@ export function LiveTraining({ matchId }: { matchId: string }) {
     await saveMatch(fresh);
     toast(message);
     rolling.current = true;
+    setCelebrating(true);
     setMatch(completed);
     rolloverTimer.current = window.setTimeout(
       () => navigate(`/live/${fresh.id}`, { replace: true }),
-      WHEEL_SPIN_MS,
+      ROLLOVER_MS,
     );
   }
 
@@ -502,8 +507,32 @@ export function LiveTraining({ matchId }: { matchId: string }) {
         </h1>
       </header>
 
-      <div className="score-card active">
+      <div className={`score-card active${celebrating ? ' celebrate' : ''}`}>
         {flashKey > 0 && <div key={flashKey} className="sc-flash" aria-hidden="true" />}
+        {celebrating && (
+          // A dozen confetti pieces scattering from the target — vectors are
+          // index-derived so the burst needs no randomness.
+          <div className="sc-celebrate" aria-hidden="true">
+            {Array.from({ length: 12 }, (_, i) => {
+              const angle = (i / 12) * 2 * Math.PI;
+              const dist = 80 + (i % 3) * 40;
+              return (
+                <span
+                  key={i}
+                  className="confetti"
+                  style={
+                    {
+                      '--cx': `${Math.round(Math.cos(angle) * dist)}px`,
+                      '--cy': `${Math.round(Math.sin(angle) * dist * 0.6 - 30)}px`,
+                      '--cr': `${140 + i * 45}deg`,
+                      animationDelay: `${(i % 4) * 60}ms`,
+                    } as CSSProperties
+                  }
+                />
+              );
+            })}
+          </div>
+        )}
         <div className="sc-top">
           <span className="sc-name">Current target</span>
           {variant === 'group' ? (
