@@ -690,7 +690,36 @@ describe('screens render without crashing', () => {
       expect(focus?.textContent).toBe('1');
       expect(focus?.className).toContain('seam');
     });
-    await waitFor(() => expect(location.hash).toBe(`#/live/${fresh!.id}`));
+    // The completion celebration plays over the boundary spin.
+    expect(container.querySelector('.score-card.celebrate')).toBeTruthy();
+    expect(container.querySelectorAll('.sc-celebrate .confetti')).toHaveLength(12);
+    await waitFor(() => expect(location.hash).toBe(`#/live/${fresh!.id}`), { timeout: 2500 });
+  });
+
+  it('History detail numbers the turns in throw order, first at the top', async () => {
+    const alice = await addPlayer('Alice');
+    const m = makeMatch({
+      id: 'h-detail',
+      gameType: 'Training',
+      playerIds: [alice.id],
+      status: 'completed',
+      winnerId: alice.id,
+      legs: [
+        makeLeg('h-detail', [
+          makeTurn(alice.id, [dart(1, '✓T20')], 0),
+          makeTurn(alice.id, [dart(0, '✗5'), dart(1, '✓5')], 0),
+        ]),
+      ],
+    });
+    await saveMatch(m);
+    const { container } = render(<History matchId="h-detail" />);
+    await screen.findByText('Targets');
+    const idx = Array.from(container.querySelectorAll('tbody .idx')).map((el) => el.textContent);
+    expect(idx).toEqual(['1', '2']);
+    const targets = Array.from(container.querySelectorAll('tbody tr td:nth-child(2)')).map(
+      (el) => el.textContent,
+    );
+    expect(targets).toEqual(['T20', '5']);
   });
 
   it('LiveTraining continues the wheel across rounds: the previous round trails behind', async () => {

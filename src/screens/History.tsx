@@ -216,6 +216,9 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
           <table className="turn-table">
             <thead>
               <tr>
+                {/* Turns read top-down in throw order; the counter makes
+                    that unambiguous at a glance. */}
+                <th className="idx">#</th>
                 {cols.map((c, ci) => (
                   <th className={ci >= 2 ? 'num' : ''} key={c}>
                     {c}
@@ -226,13 +229,14 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
             <tbody>
               {leg.turns.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="muted">
+                  <td colSpan={5} className="muted">
                     No turns
                   </td>
                 </tr>
               ) : isTraining ? (
                 leg.turns.map((turn, ti) => (
                   <tr key={ti}>
+                    <td className="idx">{ti + 1}</td>
                     <td>{turn.darts.length ? trainingFieldLabel(fieldIdFromLabel(turn.darts[0].label)) : '—'}</td>
                     <td>{turn.darts.map((d) => (d.score > 0 ? '✓' : '✗')).join(' ')}</td>
                     <td className="num">{turn.darts.length}</td>
@@ -241,6 +245,7 @@ function MatchDetail({ matchId, backTo }: { matchId: string; backTo: string }) {
               ) : (
                 leg.turns.map((turn, ti) => (
                   <tr className={turn.isBust ? 'bust' : ''} key={ti}>
+                    <td className="idx">{ti + 1}</td>
                     <td>{nameOf(turn.playerId)}</td>
                     <td>{turn.darts.map((d) => d.label).join(' · ')}</td>
                     <td className="num">{isAtc ? `+${turn.totalScore}` : turn.isBust ? 'BUST' : turn.totalScore}</td>
