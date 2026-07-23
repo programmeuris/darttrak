@@ -521,7 +521,10 @@ describe('screens render without crashing', () => {
     await saveMatch(m);
 
     render(<LiveTraining matchId="t-pad" />);
-    await screen.findByText('D10');
+    // Pinned to the focus slot: with no fixture nextBag the heal deals a
+    // random one, and ~1 round in 62 its opener is also D10 — rendered in
+    // the wheel's offscreen slot, making an unpinned lookup ambiguous.
+    await screen.findByText('D10', { selector: '.tw-item.s0' });
     // A record predating the wheel is healed with a pre-dealt next round.
     await waitFor(async () =>
       expect((await getMatch('t-pad'))!.training!.nextBag).toHaveLength(62),
@@ -562,7 +565,7 @@ describe('screens render without crashing', () => {
     await saveMatch(m);
 
     render(<LiveTraining matchId="t-act" />);
-    await screen.findByText('D10');
+    await screen.findByText('D10', { selector: '.tw-item.s0' });
 
     // Nothing has been entered yet, so there is no action to undo.
     const undoAction = () =>
@@ -747,7 +750,7 @@ describe('screens render without crashing', () => {
     await saveMatch(live);
 
     const { container } = render(<LiveTraining matchId="t-cont" />);
-    await screen.findByText('D10');
+    await screen.findByText('D10', { selector: '.tw-item.s0' });
     // The previous round's final target sits behind the fresh opener, which
     // carries the seam — the wheel reads as one line across rounds.
     await waitFor(() =>
